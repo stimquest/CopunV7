@@ -6,6 +6,9 @@
 - ✅ `netlify.toml` - Configuration minimale avec plugin Next.js
 - ✅ `package.json` - `next-pwa` dans dependencies
 - ✅ `next.config.ts` - Configuration PWA
+- ✅ `tsconfig.json` - Paths alias (@/*)
+- ✅ `jsconfig.json` - Paths alias pour webpack
+- ✅ `.nvmrc` - Version Node 18
 - ✅ `public/_headers` - Headers pour cache PWA
 - ✅ `public/manifest.json` - Manifest PWA
 - ✅ `public/offline.html` - Page offline
@@ -21,10 +24,14 @@ git push origin main
 
 ### 2. Sur Netlify Dashboard
 
-#### A. Clear cache (IMPORTANT)
-1. Allez sur **Deploys**
-2. Cliquez sur **Trigger deploy**
-3. Sélectionnez **Clear cache and deploy site**
+#### A. Clear cache ET Clear build cache (TRÈS IMPORTANT)
+1. Allez sur **Site settings** → **Build & deploy** → **Build settings**
+2. Cliquez sur **Clear build cache**
+3. Ensuite, allez sur **Deploys**
+4. Cliquez sur **Trigger deploy**
+5. Sélectionnez **Clear cache and deploy site**
+
+**POURQUOI ?** Netlify garde un cache de node_modules qui peut causer des problèmes de résolution de modules.
 
 #### B. Variables d'environnement
 1. Allez sur **Site settings** → **Environment variables**
