@@ -1,0 +1,183 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%; /* Almost white */
+    --foreground: 215 25% 25%; /* Dark grey-blue */
+
+    --card: 255 100% 100%; /* White */
+    --card-foreground: 215 25% 25%;
+
+    --popover: 255 100% 100%;
+    --popover-foreground: 215 25% 25%;
+
+    --primary: 175 75% 40%; /* Teal from image */
+    --primary-foreground: 255 100% 100%; /* White */
+
+    --secondary: 210 20% 94%; /* Light grey */
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 175 75% 45%; /* Slightly lighter Teal */
+    --accent-foreground: 255 100% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 210 15% 88%;
+    --input: 210 15% 92%;
+    --ring: 175 75% 45%;
+
+    --chart-1: 175 75% 40%;
+    --chart-2: 210 85% 60%;
+    --chart-3: 145 70% 45%;
+    --chart-4: 45 95% 55%;
+    --chart-5: 0 72% 51%;
+    --radius: 0.8rem;
+
+    /* Custom Sidebar Colors (harmonized with new theme) */
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 215 25% 25%;
+    --sidebar-primary: 175 75% 40%;
+    --sidebar-primary-foreground: 255 100% 100%;
+    --sidebar-accent: 175 75% 40%; /* Accent for active items */
+    --sidebar-accent-foreground: 255 100% 100%;
+    --sidebar-border: 210 15% 88%;
+    --sidebar-ring: 175 75% 45%;
+
+    /* COP Colors - Inspired by image corals and fish */
+    --cop-comprendre: 30 95% 60%; /* Orange/Yellow */
+    --cop-observer: 210 85% 60%; /* Deep Blue */
+    --cop-proteger: 160 80% 45%;   /* Sea Green */
+  }
+
+  .dark {
+    --background: 215 28% 17%;
+    --foreground: 210 40% 98%;
+
+    --card: 215 28% 22%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 215 28% 17%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 175 75% 45%; /* Teal */
+    --primary-foreground: 215 28% 17%;
+
+    --secondary: 215 28% 25%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 215 28% 25%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 175 75% 48%;
+    --accent-foreground: 215 28% 17%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 28% 28%;
+    --input: 215 28% 30%;
+    --ring: 175 75% 50%;
+    
+    --chart-1: 175 75% 40%;
+    --chart-2: 210 85% 60%;
+    --chart-3: 145 70% 45%;
+    --chart-4: 45 95% 55%;
+    --chart-5: 0 72% 51%;
+
+    /* Custom Sidebar Colors */
+    --sidebar-background: 215 28% 15%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 175 75% 45%;
+    --sidebar-primary-foreground: 215 28% 17%;
+    --sidebar-accent: 175 75% 45%;
+    --sidebar-accent-foreground: 215 28% 17%;
+    --sidebar-border: 215 28% 25%;
+    --sidebar-ring: 175 75% 50%;
+
+    /* COP Colors */
+    --cop-comprendre: 30 95% 60%; /* Orange/Yellow */
+    --cop-observer: 210 85% 60%; /* Deep Blue */
+    --cop-proteger: 160 80% 45%;   /* Sea Green */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-cop-comprendre { @apply bg-[hsl(var(--cop-comprendre))]; }
+  .text-cop-comprendre { @apply text-[hsl(var(--cop-comprendre))]; }
+  .border-cop-comprendre { @apply border-[hsl(var(--cop-comprendre))]; }
+  
+  .bg-cop-observer { @apply bg-[hsl(var(--cop-observer))]; }
+  .text-cop-observer { @apply text-[hsl(var(--cop-observer))]; }
+  .border-cop-observer { @apply border-[hsl(var(--cop-observer))]; }
+
+  .bg-cop-proteger { @apply bg-[hsl(var(--cop-proteger))]; }
+  .text-cop-proteger { @apply text-[hsl(var(--cop-proteger))]; }
+  .border-cop-proteger { @apply border-[hsl(var(--cop-proteger))]; }
+
+  .bg-chart-1 { @apply bg-[hsl(var(--chart-1))]; }
+  .bg-chart-2 { @apply bg-[hsl(var(--chart-2))]; }
+  .bg-chart-3 { @apply bg-[hsl(var(--chart-3))]; }
+  .bg-chart-4 { @apply bg-[hsl(var(--chart-4))]; }
+  .bg-chart-5 { @apply bg-[hsl(var(--chart-5))]; }
+
+  .bg-stage-header {
+    background-image: url('/assets/BG01.jpg');
+  }
+
+  /* Safe area utilities for mobile devices */
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .pt-safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .pb-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Mobile viewport fixes */
+  @supports (-webkit-touch-callout: none) {
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
+  }
+
+  /* Hide Next.js development indicators completely */
+  #__next-build-watcher,
+  [data-nextjs-scroll-focus-boundary],
+  .__next-dev-overlay,
+  .__next-dev-overlay-backdrop,
+  [data-nextjs-dev-overlay],
+  [data-nextjs-dev-overlay-backdrop] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Hide any floating dev indicators */
+  div[style*="position: fixed"][style*="bottom"][style*="right"] {
+    display: none !important;
+  }
+}

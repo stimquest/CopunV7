@@ -1,0 +1,69 @@
+# Supabase Project Configuration
+
+# This file is used to configure your Supabase project. It contains settings for the database, authentication, and other services.
+# For a full list of options, see https://supabase.com/docs/reference/cli/config
+
+# The project_id is the unique identifier for your Supabase project. It can be found in the URL of your project's dashboard.
+#
+# project_id = "your-project-id"
+
+[api]
+# The port to use for the API. Defaults to 54321.
+port = 54321
+# The schemas to expose in the API. Defaults to ["public", "storage"].
+schemas = ["public", "storage"]
+# The extra schemas to expose in the API. Defaults to [].
+extra_schemas = []
+# The maximum number of rows to return from a query. Defaults to 1000.
+max_rows = 1000
+
+[db]
+# The port to use for the database. Defaults to 54322.
+port = 54322
+# The major version of Postgres to use. Defaults to 15.
+major_version = 15
+
+[studio]
+# The port to use for Supabase Studio. Defaults to 54323.
+port = 54323
+
+# The name of the organization that owns the project.
+# org = "your-org-name"
+
+[auth]
+# The site URL of your application. Defaults to "http://localhost:3000".
+site_url = "http://localhost:3000"
+# A list of additional redirect URLs. Defaults to [].
+additional_redirect_urls = []
+# Whether to enable the email provider. Defaults to true.
+enable_email_provider = true
+# Whether to enable the phone provider. Defaults to true.
+enable_phone_provider = true
+# The time limit for sending an email or phone verification. Defaults to 86400 seconds.
+otp_expiry = 86400
+# The time limit for sending a new email or phone verification. Defaults to 60 seconds.
+otp_rate_limit = 60
+
+[migrations]
+# The list of migrations to run. The migrations are run in the order they are listed.
+# The path to the migration files is relative to the "supabase" directory.
+#
+# The format for a migration file is "YYYYMMDDHHMMSS_migration_name.sql".
+#
+# You can add new migrations by creating a new file in the "migrations" directory and adding it to this list.
+#
+# For example:
+#
+# [[migrations]]
+# version = "20211209183329"
+# name = "initial_schema"
+#
+# [[migrations]]
+# version = "20211209183330"
+# name = "add_users_table"
+#
+# For more information, see https://supabase.com/docs/guides/migrations
+all = [
+    "20240730120000_add_exploits.sql",
+    "20240731100000_create_pedagogical_content.sql"
+]
