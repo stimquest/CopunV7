@@ -190,6 +190,17 @@ const nextConfig: NextConfig = {
 
   // Netlify specific configuration
   trailingSlash: false,
+
+  // Webpack configuration for module resolution
+  webpack: (config, { isServer }) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js', '.jsx'],
+      '.mjs': ['.mts', '.mjs'],
+      '.cjs': ['.cts', '.cjs'],
+    };
+    return config;
+  },
+
   images: {
     // unoptimized: true, // Not needed for PWA
     remotePatterns: [
