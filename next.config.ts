@@ -9,6 +9,7 @@ const withPWA = require('next-pwa')({
   fallbacks: {
     document: '/offline.html',
   },
+  buildExcludes: [/middleware-manifest\.json$/],
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -186,6 +187,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+
+  // Netlify specific configuration
+  trailingSlash: false,
   images: {
     // unoptimized: true, // Not needed for PWA
     remotePatterns: [

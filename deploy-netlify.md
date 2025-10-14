@@ -1,5 +1,15 @@
 # 🚀 Déploiement Netlify - Cop'un de la mer
 
+## ⚠️ IMPORTANT - Configuration corrigée
+
+### 1. **Plugin Netlify installé** ✅
+Le plugin `@netlify/plugin-nextjs` est maintenant installé pour gérer Next.js correctement.
+
+### 2. **Configuration netlify.toml corrigée** ✅
+- Suppression du `publish = ".next"` incorrect
+- Ajout du plugin Next.js officiel
+- Configuration PWA optimisée
+
 ## 📋 Variables d'environnement à configurer
 
 ### Sur Netlify Dashboard :
