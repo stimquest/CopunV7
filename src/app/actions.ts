@@ -579,16 +579,23 @@ async function seedInitialGameCards() {
 }
 
 
-const convertDbToGameCard = (dbCard: DbGameCard): GameCard => {
+const convertDbToGameCard = (dbCard: DbGameCard): GameCard | null => {
     const cardData = dbCard.data as DbGameCardData;
-    if (typeof cardData !== 'object' || cardData === null || !('theme' in cardData)) {
+    if (typeof cardData !== 'object' || cardData === null) {
         console.error('Invalid card data format', dbCard);
-        throw new Error(`Invalid data for card ID ${dbCard.id}`);
+        return null;
     }
+
+    // Ajouter un thème par défaut si manquant
+    const enrichedData = {
+        theme: 'Général', // Thème par défaut
+        ...cardData
+    };
+
     return {
         id: dbCard.id,
         type: dbCard.type,
-        ...cardData
+        ...enrichedData
     } as GameCard;
 };
 
