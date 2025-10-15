@@ -12,6 +12,8 @@ import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay } from 'da
 import { fr } from 'date-fns/locale';
 import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress, GameCard, PedagogicalContent } from '@/lib/types';
 import { getStages, createStage as serverCreateStage, getSortiesForStage, getGamesForStage, getAllGameCardsFromDb, getPedagogicalContent } from '@/app/actions';
+import { supabaseOffline } from '@/lib/supabase-offline';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -198,17 +200,21 @@ export default function StageManagerPage() {
     const [loading, setLoading] = useState(true);
     const [isCreating, startCreateTransition] = useTransition();
     const { toast } = useToast();
+    const { isOnline, wasOffline } = useOnlineStatus();
     const [allDbGameCards, setAllDbGameCards] = useState<GameCard[]>([]);
     const [allPedagogicalContent, setAllPedagogicalContent] = useState<PedagogicalContent[]>([]);
 
     const fetchStages = async () => {
         setLoading(true);
-        const [stagesData, gameCardsData, pedagogicalContent] = await Promise.all([getStages(), getAllGameCardsFromDb(), getPedagogicalContent()]);
+
+        // Utiliser le système offline pour les stages
+        const { data: stagesData } = await supabaseOffline.getStages();
+        const [gameCardsData, pedagogicalContent] = await Promise.all([getAllGameCardsFromDb(), getPedagogicalContent()]);
         setAllDbGameCards(gameCardsData);
         setAllPedagogicalContent(pedagogicalContent);
-        
+
         const stagesWithProgressData: StageWithProgress[] = await Promise.all(
-            stagesData.map(async (stage) => {
+            (stagesData || []).map(async (stage) => {
                 const [sorties, games] = await Promise.all([
                     getSortiesForStage(stage.id),
                     getGamesForStage(stage.id)
@@ -323,6 +329,14 @@ export default function StageManagerPage() {
     useEffect(() => {
         fetchStages();
     }, []);
+
+    // Synchroniser quand on revient online
+    useEffect(() => {
+        if (isOnline && wasOffline) {
+            supabaseOffline.syncOfflineActions();
+            fetchStages(); // Recharger les données
+        }
+    }, [isOnline, wasOffline]);
 
     const { currentStages, upcomingStages, pastStages } = useMemo(() => {
         const today = startOfToday();

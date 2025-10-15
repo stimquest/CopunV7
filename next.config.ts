@@ -140,6 +140,22 @@ const withPWA = require('next-pwa')({
         },
       },
     },
+    // Supabase API calls - Cache pour offline
+    {
+      urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'supabase-api-cache',
+        expiration: {
+          maxEntries: 200,
+          maxAgeSeconds: 60 * 60 * 24, // 24 heures pour offline
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+        networkTimeoutSeconds: 3, // Timeout rapide pour passer en cache
+      },
+    },
     {
       urlPattern: ({ url }) => {
         const isSameOrigin = self.origin === url.origin;
