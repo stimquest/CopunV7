@@ -287,7 +287,11 @@ export async function saveOrUpdateProgramForStage(
 // --- PEDAGOGICAL CONTENT (from Supabase) ---
 
 export async function getPedagogicalContent(): Promise<PedagogicalContent[]> {
-    const { data, error } = await supabase.from('pedagogical_content').select('*').order('id');
+    const { data, error } = await supabase
+        .from('pedagogical_content')
+        .select('*')
+        .order('id')
+        .limit(500); // Limite raisonnable pour le contenu pédagogique
     if (error) {
         console.error("Error fetching pedagogical content:", error);
         return [];
@@ -422,7 +426,11 @@ export async function getEtagesData(): Promise<EtagesData | null> {
 
 // OBSERVATIONS
 export async function getObservations(): Promise<Observation[]> {
-    const { data, error } = await supabase.from('observations').select('*').order('observation_date', { ascending: false });
+    const { data, error } = await supabase
+        .from('observations')
+        .select('*')
+        .order('observation_date', { ascending: false })
+        .limit(100); // Limite à 100 observations récentes
     if (error) {
         console.error('Error fetching observations:', error);
         return [];
@@ -586,9 +594,16 @@ const convertDbToGameCard = (dbCard: DbGameCard): GameCard => {
 
 
 export async function getAllGameCardsFromDb(): Promise<GameCard[]> {
-  await seedInitialGameCards();
+  // Paralléliser seed et requête
+  const [, { data, error }] = await Promise.all([
+    seedInitialGameCards(),
+    supabase
+      .from('game_cards')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200) // Limite pour éviter les requêtes trop lourdes
+  ]);
 
-  const { data, error } = await supabase.from('game_cards').select('*').order('created_at', { ascending: false });
   if (error) {
     console.error('Error fetching game cards:', error);
     return [];
@@ -602,22 +617,30 @@ export async function getAllGameCardsFromDb(): Promise<GameCard[]> {
 }
 
 export async function getFilteredGameCards(types: GameCardType[], themes: string[], objectiveIds: string[] = []): Promise<GameCard[]> {
-    await seedInitialGameCards();
-    let query = supabase.from('game_cards').select('*');
+    // Paralléliser seed et requête
+    const [, { data, error }] = await Promise.all([
+        seedInitialGameCards(),
+        (async () => {
+            let query = supabase
+                .from('game_cards')
+                .select('*')
+                .limit(100); // Limite pour les performances
 
-    if (types.length > 0) {
-        query = query.in('type', types);
-    }
-    
-    if (themes.length > 0) {
-        query = query.in('data->>theme', themes);
-    }
+            if (types.length > 0) {
+                query = query.in('type', types);
+            }
 
-    if (objectiveIds.length > 0) {
-       query = query.in('data->>related_objective_id', objectiveIds);
-    }
+            if (themes.length > 0) {
+                query = query.in('data->>theme', themes);
+            }
 
-    const { data, error } = await query;
+            if (objectiveIds.length > 0) {
+               query = query.in('data->>related_objective_id', objectiveIds);
+            }
+
+            return await query;
+        })()
+    ]);
 
     if (error) {
         console.error('Error fetching filtered game cards:', error);
@@ -691,7 +714,11 @@ export async function createGame(title: string, theme: string, gameData: GameDat
 }
 
 export async function getGames(): Promise<Game[]> {
-    const { data, error } = await supabase.from('games').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50); // Limite à 50 jeux récents
     if (error) {
         console.error('Error fetching games:', error);
         return [];
