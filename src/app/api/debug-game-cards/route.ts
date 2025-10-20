@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const action = searchParams.get('action');
+
+    if (action === 'pedagogical') {
+      // Debug pour le contenu pédagogique
+      console.log('=== DEBUG: Contenu pédagogique ===');
+
+      const { data, error } = await supabase
+        .from('pedagogical_content')
+        .select('id, question, dimension, tags_theme')
+        .limit(10);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        pedagogicalContent: data,
+        message: `${data?.length || 0} fiches pédagogiques trouvées`
+      });
+    }
+
     console.log('=== DEBUG: Test connexion Supabase ===');
     console.log('URL Supabase:', process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log('Clé Supabase (premiers chars):', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...');

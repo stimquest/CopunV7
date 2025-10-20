@@ -281,7 +281,17 @@ const ObjectivesView = ({
         }
 
         filteredObjectives.forEach((card: PedagogicalContent) => {
-            const pillar = card.dimension.toLowerCase() as keyof typeof grouped;
+            // Normaliser le pilier : supprimer les accents et convertir en minuscules
+            const normalizedDimension = card.dimension
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
+
+            // Mapper les valeurs possibles
+            let pillar: keyof typeof grouped = 'comprendre';
+            if (normalizedDimension.includes('observer')) pillar = 'observer';
+            else if (normalizedDimension.includes('proteg')) pillar = 'proteger';
+
             if (grouped[pillar] && !grouped[pillar].some(c => c.id === card.id)) {
                 grouped[pillar].push(card);
             }
