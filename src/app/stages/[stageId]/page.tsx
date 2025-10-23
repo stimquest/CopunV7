@@ -857,14 +857,14 @@ const ProgrammeBuilder = ({
                 </CardHeader>
                 <CardContent>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="grid w-full grid-cols-2 md:hidden">
                             <TabsTrigger value="explore">Explorer les fiches ({filteredAvailableCards.length})</TabsTrigger>
                             <TabsTrigger value="selected">Mon Programme ({items.selected.length})</TabsTrigger>
                         </TabsList>
-                        
-                        <div className="flex flex-col md:flex-row gap-4 mt-4">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             {/* Explorer Column */}
-                            <div className={cn("w-full md:w-1/2", activeTab !== 'explore' && 'hidden md:block')}>
+                            <div className={cn("w-full", activeTab !== 'explore' && 'hidden md:block')}>
                                 <div className="space-y-2">
                                      <div className="flex flex-col sm:flex-row flex-wrap gap-2 p-2 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mx-2 px-2">
                                         <ToggleGroup type="single" value={pillarFilter ?? ""} onValueChange={(value) => setPillarFilter(value || null)}>
@@ -913,9 +913,9 @@ const ProgrammeBuilder = ({
                                     </div>
                                 </div>
                             </div>
-                            
+
                            {/* Selected Column */}
-                           <div className={cn("w-full md:w-1/2", activeTab !== 'selected' && 'hidden md:block')}>
+                           <div className={cn("w-full", activeTab !== 'selected' && 'hidden md:block')}>
                                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                                     <div className="min-h-[400px] max-h-[60vh] overflow-y-auto bg-muted/50 p-2 rounded-lg space-y-2">
                                         <SortableContext items={items.selected.map(i => i.id.toString())} strategy={verticalListSortingStrategy}>
