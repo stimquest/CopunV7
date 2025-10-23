@@ -105,6 +105,22 @@ class OfflineCache {
     return this.get('game_cards');
   }
 
+  cacheSorties(stageId: number, sorties: any[]): void {
+    this.set(`sorties_${stageId}`, sorties);
+  }
+
+  getCachedSorties(stageId: number): any[] | null {
+    return this.get(`sorties_${stageId}`);
+  }
+
+  cachePedagogicalContent(content: any[]): void {
+    this.set('pedagogical_content', content);
+  }
+
+  getCachedPedagogicalContent(): any[] | null {
+    return this.get('pedagogical_content');
+  }
+
   // Queue for offline actions
   queueOfflineAction(action: any): void {
     const queue = this.get<any[]>('offline_queue') || [];

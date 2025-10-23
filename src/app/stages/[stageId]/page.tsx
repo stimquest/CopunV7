@@ -241,21 +241,22 @@ export default function StageDetailPage() {
 
 // --- Sub-components for Tabs ---
 
-const ObjectivesView = ({ 
-    stageId, 
-    objectives, 
-    games, 
-    completedObjectives, 
-    onToggleObjective 
-}: { 
-    stageId: number; 
-    objectives: PedagogicalContent[]; 
+const ObjectivesView = ({
+    stageId,
+    objectives,
+    games,
+    completedObjectives,
+    onToggleObjective
+}: {
+    stageId: number;
+    objectives: PedagogicalContent[];
     games: Game[];
-    completedObjectives: Set<string>; 
-    onToggleObjective: (cardId: string) => void 
+    completedObjectives: Set<string>;
+    onToggleObjective: (cardId: string) => void
 }) => {
     const [activeThemeFilters, setActiveThemeFilters] = useState<string[]>([]);
     const [showOnlyNotSeen, setShowOnlyNotSeen] = useState(true);
+    const [animatingOut, setAnimatingOut] = useState<Set<string>>(new Set());
     
     const themesInProgram = useMemo(() => {
         const themeIds = new Set<string>();
@@ -300,11 +301,26 @@ const ObjectivesView = ({
     }, [objectives, activeThemeFilters, showOnlyNotSeen, completedObjectives]);
     
     const handleThemeFilterToggle = (themeId: string) => {
-        setActiveThemeFilters(prev => 
-            prev.includes(themeId) 
+        setActiveThemeFilters(prev =>
+            prev.includes(themeId)
                 ? prev.filter(id => id !== themeId)
                 : [...prev, themeId]
         );
+    };
+
+    const handleToggleObjectiveWithAnimation = (cardId: string) => {
+        // Marquer comme en cours d'animation
+        setAnimatingOut(prev => new Set([...prev, cardId]));
+
+        // Attendre la fin de l'animation avant de mettre à jour l'état
+        setTimeout(() => {
+            onToggleObjective(cardId);
+            setAnimatingOut(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(cardId);
+                return newSet;
+            });
+        }, 300); // Durée de l'animation
     };
 
     if (objectives.length === 0) {
@@ -367,44 +383,52 @@ const ObjectivesView = ({
                         </h3>
                         <Accordion type="multiple" className="w-full space-y-2">
                             {cards.map((card: PedagogicalContent) => (
-                                <AccordionItem value={card.id.toString()} key={card.id} className="border-b-0">
-                                    <Card className={cn("transition-all overflow-hidden bg-card", completedObjectives.has(card.id.toString()) ? 'opacity-50' : 'opacity-100')}>
-                                        <div className={cn("flex items-stretch p-1 justify-between gap-2 border-l-4 rounded-l-md", pillarStyle.border)}>
-                                            {card.icon_tag && (
-                                                <div className="p-3 pl-2 flex items-center justify-center shrink-0">
-                                                    <Image src={`/assets/icons/${card.icon_tag}.png?v=${new Date().getTime()}`} alt={card.icon_tag} width={60} height={60} className="object-contain" />
+                                <motion.div
+                                    key={card.id}
+                                    initial={{ opacity: 1, height: 'auto' }}
+                                    animate={animatingOut.has(card.id.toString()) ? { opacity: 0, height: 0, marginBottom: 0 } : { opacity: 1, height: 'auto' }}
+                                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                    className="overflow-hidden"
+                                >
+                                    <AccordionItem value={card.id.toString()} className="border-b-0">
+                                        <Card className={cn("transition-all overflow-hidden bg-card", completedObjectives.has(card.id.toString()) ? 'opacity-50' : 'opacity-100')}>
+                                            <div className={cn("flex items-stretch p-1 justify-between gap-2 border-l-4 rounded-l-md", pillarStyle.border)}>
+                                                {card.icon_tag && (
+                                                    <div className="p-3 pl-2 flex items-center justify-center shrink-0">
+                                                        <Image src={`/assets/icons/${card.icon_tag}.png?v=${new Date().getTime()}`} alt={card.icon_tag} width={60} height={60} className="object-contain" />
+                                                    </div>
+                                                )}
+                                                <div className={cn("flex-grow p-3 space-y-2", !card.icon_tag && "pl-4")}>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {card.tags_theme.map(themeId => {
+                                                            const theme = allGrandThemes.find(t => t.id === themeId);
+                                                            return theme ? <Badge key={themeId} variant="outline" className="font-normal">{theme.title}</Badge> : null;
+                                                        })}
+                                                    </div>
+                                                    <p className="font-medium text-foreground text-sm">{card.question}</p>
                                                 </div>
-                                            )}
-                                            <div className={cn("flex-grow p-3 space-y-2", !card.icon_tag && "pl-4")}>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {card.tags_theme.map(themeId => {
-                                                        const theme = allGrandThemes.find(t => t.id === themeId);
-                                                        return theme ? <Badge key={themeId} variant="outline" className="font-normal">{theme.title}</Badge> : null;
-                                                    })}
+
+                                                <div className="flex flex-col items-center gap-2 pl-2 pr-1 shrink-0 pt-3">
+                                                     <Switch
+                                                        checked={completedObjectives.has(card.id.toString())}
+                                                        onCheckedChange={() => handleToggleObjectiveWithAnimation(card.id.toString())}
+                                                        aria-label="Marquer comme vu"
+                                                    />
+                                                    <AccordionTrigger className="p-1 hover:no-underline [&>svg]:mx-auto">
+                                                        <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
+                                                    </AccordionTrigger>
                                                 </div>
-                                                <p className="font-medium text-foreground text-sm">{card.question}</p>
                                             </div>
-                                            
-                                            <div className="flex flex-col items-center gap-2 pl-2 pr-1 shrink-0 pt-3">
-                                                 <Switch 
-                                                    checked={completedObjectives.has(card.id.toString())}
-                                                    onCheckedChange={() => onToggleObjective(card.id.toString())}
-                                                    aria-label="Marquer comme vu"
-                                                />
-                                                <AccordionTrigger className="p-1 hover:no-underline [&>svg]:mx-auto">
-                                                    <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
-                                                </AccordionTrigger>
-                                            </div>
-                                        </div>
-                                        <AccordionContent>
-                                            <div className="border-t mx-3"></div>
-                                            <div className="px-3 pb-3 pt-2 text-muted-foreground text-sm space-y-2">
-                                                <p><span className="font-semibold text-foreground/80">Objectif:</span> {card.objectif}</p>
-                                                {card.tip && <p><span className="font-semibold text-foreground/80">Conseil:</span> {card.tip}</p>}
-                                            </div>
-                                        </AccordionContent>
-                                    </Card>
-                                </AccordionItem>
+                                            <AccordionContent>
+                                                <div className="border-t mx-3"></div>
+                                                <div className="px-3 pb-3 pt-2 text-muted-foreground text-sm space-y-2">
+                                                    <p><span className="font-semibold text-foreground/80">Objectif:</span> {card.objectif}</p>
+                                                    {card.tip && <p><span className="font-semibold text-foreground/80">Conseil:</span> {card.tip}</p>}
+                                                </div>
+                                            </AccordionContent>
+                                        </Card>
+                                    </AccordionItem>
+                                </motion.div>
                             ))}
                         </Accordion>
                     </div>

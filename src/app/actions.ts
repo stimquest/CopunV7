@@ -12,21 +12,32 @@ import { contextData, groupedThemes } from '@/data/etages';
 
 // STAGES
 export async function getStages(): Promise<Stage[]> {
-  const { data, error } = await supabase.from('stages').select('*').order('start_date', { ascending: true });
-  if (error) {
+  // Note: This is a server action, but we'll try to use offline cache if available
+  try {
+    const { data, error } = await supabase.from('stages').select('*').order('start_date', { ascending: true });
+    if (error) {
+      console.error('Error fetching stages:', error);
+      return [];
+    }
+    return data;
+  } catch (error) {
     console.error('Error fetching stages:', error);
     return [];
   }
-  return data;
 }
 
 export async function getStageById(id: number): Promise<Stage | null> {
-    const { data, error } = await supabase.from('stages').select('*').eq('id', id).single();
-    if (error) {
-        console.error('Error fetching stage:', error);
-        return null;
+    try {
+      const { data, error } = await supabase.from('stages').select('*').eq('id', id).single();
+      if (error) {
+          console.error('Error fetching stage:', error);
+          return null;
+      }
+      return data;
+    } catch (error) {
+      console.error('Error fetching stage:', error);
+      return null;
     }
-    return data;
 }
 
 
@@ -86,16 +97,21 @@ export async function deleteStage(stageId: number) {
 
 // SORTIES
 export async function getSortiesForStage(stageId: number): Promise<Sortie[]> {
-    const { data, error } = await supabase.from('sorties').select('*').eq('stage_id', stageId).order('date', { ascending: false });
-    if (error) {
-        console.error('Error fetching sorties:', error);
-        return [];
+    try {
+      const { data, error } = await supabase.from('sorties').select('*').eq('stage_id', stageId).order('date', { ascending: false });
+      if (error) {
+          console.error('Error fetching sorties:', error);
+          return [];
+      }
+      return data.map(s => ({
+          ...s,
+          selected_notions: s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 },
+          selected_content: s.selected_content || {},
+      }));
+    } catch (error) {
+      console.error('Error fetching sorties:', error);
+      return [];
     }
-    return data.map(s => ({ 
-        ...s, 
-        selected_notions: s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 },
-        selected_content: s.selected_content || {},
-    }));
 }
 
 export async function getSortieById(sortieId: number): Promise<Sortie | null> {
@@ -287,25 +303,35 @@ export async function saveOrUpdateProgramForStage(
 // --- PEDAGOGICAL CONTENT (from Supabase) ---
 
 export async function getPedagogicalContent(): Promise<PedagogicalContent[]> {
-    const { data, error } = await supabase
-        .from('pedagogical_content')
-        .select('*')
-        .order('id')
-        .limit(500); // Limite raisonnable pour le contenu pédagogique
-    if (error) {
-        console.error("Error fetching pedagogical content:", error);
-        return [];
+    try {
+      const { data, error } = await supabase
+          .from('pedagogical_content')
+          .select('*')
+          .order('id')
+          .limit(500); // Limite raisonnable pour le contenu pédagogique
+      if (error) {
+          console.error("Error fetching pedagogical content:", error);
+          return [];
+      }
+      return data;
+    } catch (error) {
+      console.error("Error fetching pedagogical content:", error);
+      return [];
     }
-    return data;
 }
 
 export async function getPedagogicalContentById(id: number): Promise<PedagogicalContent | null> {
-    const { data, error } = await supabase.from('pedagogical_content').select('*').eq('id', id).single();
-    if (error) {
-        console.error("Error fetching pedagogical content by id:", error);
-        return null;
+    try {
+      const { data, error } = await supabase.from('pedagogical_content').select('*').eq('id', id).single();
+      if (error) {
+          console.error("Error fetching pedagogical content by id:", error);
+          return null;
+      }
+      return data;
+    } catch (error) {
+      console.error("Error fetching pedagogical content by id:", error);
+      return null;
     }
-    return data;
 }
 
 export async function createPedagogicalContent(content: Omit<PedagogicalContent, 'id'>) {

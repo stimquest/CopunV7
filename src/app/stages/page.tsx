@@ -13,6 +13,7 @@ import { fr } from 'date-fns/locale';
 import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress, GameCard, PedagogicalContent } from '@/lib/types';
 import { getStages, createStage as serverCreateStage, getSortiesForStage, getGamesForStage, getAllGameCardsFromDb, getPedagogicalContent } from '@/app/actions';
 import { supabaseOffline } from '@/lib/supabase-offline';
+import { getStagesOfflineAware, getSortiesForStageOfflineAware, getPedagogicalContentOfflineAware } from '@/lib/offline-actions';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -208,15 +209,15 @@ export default function StageManagerPage() {
         setLoading(true);
 
         // Utiliser le système offline pour les stages
-        const { data: stagesData } = await supabaseOffline.getStages();
-        const [gameCardsData, pedagogicalContent] = await Promise.all([getAllGameCardsFromDb(), getPedagogicalContent()]);
+        const stagesData = await getStagesOfflineAware();
+        const [gameCardsData, pedagogicalContent] = await Promise.all([getAllGameCardsFromDb(), getPedagogicalContentOfflineAware()]);
         setAllDbGameCards(gameCardsData);
         setAllPedagogicalContent(pedagogicalContent);
 
         const stagesWithProgressData: StageWithProgress[] = await Promise.all(
             (stagesData || []).map(async (stage) => {
                 const [sorties, games] = await Promise.all([
-                    getSortiesForStage(stage.id),
+                    getSortiesForStageOfflineAware(stage.id),
                     getGamesForStage(stage.id)
                 ]);
 

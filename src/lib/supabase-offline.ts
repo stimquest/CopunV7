@@ -130,17 +130,86 @@ export class SupabaseOffline {
       } else {
         // Return cached data when offline
         const cachedData = offlineCache.getCachedGameCards();
-        return { 
-          data: cachedData, 
-          error: cachedData ? null : new Error('Aucune donnée en cache') 
+        return {
+          data: cachedData,
+          error: cachedData ? null : new Error('Aucune donnée en cache')
         };
       }
     } catch (error) {
       // Fallback to cache on error
       const cachedData = offlineCache.getCachedGameCards();
-      return { 
-        data: cachedData, 
-        error: cachedData ? null : error 
+      return {
+        data: cachedData,
+        error: cachedData ? null : error
+      };
+    }
+  }
+
+  async getSorties(stageId: number) {
+    try {
+      if (this.isOnline()) {
+        const { data, error } = await supabase
+          .from('sorties')
+          .select('*')
+          .eq('stage_id', stageId)
+          .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        // Cache the data
+        if (data) {
+          offlineCache.cacheSorties(stageId, data);
+        }
+
+        return { data, error: null };
+      } else {
+        // Return cached data when offline
+        const cachedData = offlineCache.getCachedSorties(stageId);
+        return {
+          data: cachedData,
+          error: cachedData ? null : new Error('Aucune donnée en cache')
+        };
+      }
+    } catch (error) {
+      // Fallback to cache on error
+      const cachedData = offlineCache.getCachedSorties(stageId);
+      return {
+        data: cachedData,
+        error: cachedData ? null : error
+      };
+    }
+  }
+
+  async getPedagogicalContent() {
+    try {
+      if (this.isOnline()) {
+        const { data, error } = await supabase
+          .from('pedagogical_content')
+          .select('*')
+          .order('id');
+
+        if (error) throw error;
+
+        // Cache the data
+        if (data) {
+          offlineCache.cachePedagogicalContent(data);
+        }
+
+        return { data, error: null };
+      } else {
+        // Return cached data when offline
+        const cachedData = offlineCache.getCachedPedagogicalContent();
+        return {
+          data: cachedData,
+          error: cachedData ? null : new Error('Aucune donnée en cache')
+        };
+      }
+    } catch (error) {
+      // Fallback to cache on error
+      const cachedData = offlineCache.getCachedPedagogicalContent();
+      return {
+        data: cachedData,
+        error: cachedData ? null : error
       };
     }
   }
