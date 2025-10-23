@@ -890,14 +890,40 @@ const ProgrammeBuilder = ({
                             {/* Explorer Column */}
                             <div className={cn("w-full", activeTab !== 'explore' && 'hidden md:block')}>
                                 <div className="space-y-2">
-                                     <div className="flex flex-col sm:flex-row flex-wrap gap-2 p-2 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mx-2 px-2">
-                                        <ToggleGroup type="single" value={pillarFilter ?? ""} onValueChange={(value) => setPillarFilter(value || null)}>
-                                            {Object.entries(PILLAR_STYLES).map(([key, { icon: PillarIcon, text }]) => (
-                                                <ToggleGroupItem key={key} value={key} className={cn("border bg-background data-[state=on]:bg-transparent h-9", pillarFilter === key && `${PILLAR_STYLES[key as keyof typeof PILLAR_STYLES].filterBadge} data-[state=on]:bg-transparent`)}>
-                                                    <PillarIcon className={cn("w-4 h-4 mr-2 text-muted-foreground", pillarFilter === key && text)} />
-                                                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                                                </ToggleGroupItem>
-                                            ))}
+                                     <div className="flex flex-col sm:flex-row flex-wrap gap-2 p-2 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mx-2 px-2 overflow-x-auto">
+                                        <ToggleGroup type="single" value={pillarFilter ?? ""} onValueChange={(value) => setPillarFilter(value || null)} className="flex-shrink-0">
+                                            {Object.entries(PILLAR_STYLES).map(([key, { icon: PillarIcon }]) => {
+                                                const isActive = pillarFilter === key;
+                                                const textColor = key === 'comprendre' ? '#1e40af' :
+                                                                 key === 'observer' ? '#15803d' :
+                                                                 '#b45309';
+                                                const bgColor = key === 'comprendre' ? '#dbeafe' :
+                                                               key === 'observer' ? '#dcfce7' :
+                                                               '#fed7aa';
+                                                const borderColor = key === 'comprendre' ? '#93c5fd' :
+                                                                   key === 'observer' ? '#86efac' :
+                                                                   '#fdba74';
+
+                                                return (
+                                                    <ToggleGroupItem
+                                                        key={key}
+                                                        value={key}
+                                                        className="border h-9 whitespace-nowrap"
+                                                        style={isActive ? {
+                                                            backgroundColor: bgColor,
+                                                            borderColor: borderColor,
+                                                            color: textColor
+                                                        } : {
+                                                            backgroundColor: 'var(--background)',
+                                                            borderColor: '#d1d5db',
+                                                            color: 'var(--foreground)'
+                                                        }}
+                                                    >
+                                                        <PillarIcon className="w-4 h-4 mr-2" style={isActive ? { color: textColor } : {}} />
+                                                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                                                    </ToggleGroupItem>
+                                                );
+                                            })}
                                         </ToggleGroup>
                                          <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
