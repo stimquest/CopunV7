@@ -11,7 +11,7 @@ import { CreateStageForm } from '@/components/create-stage-form';
 import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress, GameCard, PedagogicalContent } from '@/lib/types';
-import { getStages, createStage as serverCreateStage, getSortiesForStage, getGamesForStage, getAllGameCardsFromDb, getPedagogicalContent, getCompletedObjectives, getStageExploits, getStageGameHistory } from '@/app/actions';
+import { getStages, createStage as serverCreateStage, getAllSorties, getAllGames, getAllGameCardsFromDb, getPedagogicalContent, getAllCompletedObjectives, getAllStageExploits, getAllStageGameHistory } from '@/app/actions';
 import { supabaseOffline } from '@/lib/supabase-offline';
 import { getStagesOfflineAware, getSortiesForStageOfflineAware, getPedagogicalContentOfflineAware } from '@/lib/offline-actions';
 import { useOnlineStatus } from '@/hooks/use-online-status';
@@ -207,10 +207,23 @@ export default function StageManagerPage() {
 
     const fetchStages = async () => {
         setLoading(true);
+        const startTime = performance.now();
 
-        // Utiliser le système offline pour les stages
-        const stagesData = await getStagesOfflineAware();
-        const [gameCardsData, pedagogicalContent] = await Promise.all([getAllGameCardsFromDb(), getPedagogicalContentOfflineAware()]);
+        // Charger toutes les données en une seule fois (optimisation)
+        console.log('[fetchStages] 🚀 Starting data fetch...');
+        const fetchStart = performance.now();
+        const [stagesData, gameCardsData, pedagogicalContent, allCompletedObjectivesMap, allExploitsMap, allGameHistoryMap, allSortiesMap, allGamesMap] = await Promise.all([
+            getStagesOfflineAware(),
+            getAllGameCardsFromDb(),
+            getPedagogicalContentOfflineAware(),
+            getAllCompletedObjectives(),
+            getAllStageExploits(),
+            getAllStageGameHistory(),
+            getAllSorties(),
+            getAllGames()
+        ]);
+        console.log(`[fetchStages] ⏱️ Initial data fetch took ${(performance.now() - fetchStart).toFixed(0)}ms`);
+
         setAllDbGameCards(gameCardsData || []);
         setAllPedagogicalContent(pedagogicalContent || []);
 
@@ -220,10 +233,9 @@ export default function StageManagerPage() {
 
         const stagesWithProgressData: StageWithProgress[] = await Promise.all(
             (stagesData || []).map(async (stage) => {
-                const [sorties, games] = await Promise.all([
-                    getSortiesForStageOfflineAware(stage.id),
-                    getGamesForStage(stage.id)
-                ]);
+                // Récupérer les données depuis les Maps (déjà chargées)
+                const sorties = allSortiesMap.get(stage.id) || [];
+                const games = allGamesMap.get(stage.id) || [];
 
                 const programSortie = sorties.find(s => s.selected_content?.program?.length ?? 0 > 0);
 
@@ -236,8 +248,8 @@ export default function StageManagerPage() {
                 if (programSortie && programSortie.selected_content.program) {
                     const programObjectiveIds = new Set(programSortie.selected_content.program);
 
-                    // Récupérer les objectifs complétés depuis Supabase
-                    const completedObjectivesFromDb = await getCompletedObjectives(stage.id);
+                    // Récupérer les objectifs complétés depuis la Map (déjà chargée)
+                    const completedObjectivesFromDb = allCompletedObjectivesMap.get(stage.id) || [];
                     const completedIds = new Set(completedObjectivesFromDb);
                     
                     const allThemeIdsInProgram = new Set<string>();
@@ -274,12 +286,12 @@ export default function StageManagerPage() {
                 }
                 
                 // --- Calculate defis progress ---
-                const stageExploits = await getStageExploits(stage.id);
+                const stageExploits = allExploitsMap.get(stage.id) || [];
                 defisProgress.total = stageExploits.length;
                 defisProgress.completed = stageExploits.filter(e => e.status === 'complete').length;
 
                 // --- Calculate games/quiz progress ---
-                const gameHistory = await getStageGameHistory(stage.id);
+                const gameHistory = allGameHistoryMap.get(stage.id) || [];
                 if (gameHistory.length > 0) {
                     let totalCorrect = 0;
                     let totalQuestions = 0;
@@ -329,6 +341,7 @@ export default function StageManagerPage() {
         );
 
         setStagesWithProgress(stagesWithProgressData);
+        console.log(`[fetchStages] ✅ Total time: ${(performance.now() - startTime).toFixed(0)}ms for ${stagesWithProgressData.length} stages`);
         setLoading(false);
     };
 

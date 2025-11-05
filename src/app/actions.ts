@@ -115,6 +115,39 @@ export async function getSortiesForStage(stageId: number): Promise<Sortie[]> {
     }
 }
 
+// Nouvelle fonction pour charger toutes les sorties en une seule requête
+export async function getAllSorties(): Promise<Map<number, Sortie[]>> {
+    const start = performance.now();
+    try {
+      const { data, error } = await supabase.from('sorties').select('*').order('date', { ascending: false });
+      const duration = performance.now() - start;
+
+      if (error) {
+          console.error('Error fetching all sorties:', error);
+          return new Map();
+      }
+
+      const sortiesByStage = new Map<number, Sortie[]>();
+      data?.forEach(s => {
+          const sortie: Sortie = {
+              ...s,
+              selected_notions: (s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
+              selected_content: (s.selected_content || {}) as Partial<SelectedContent>,
+          };
+          if (!sortiesByStage.has(s.stage_id)) {
+              sortiesByStage.set(s.stage_id, []);
+          }
+          sortiesByStage.get(s.stage_id)!.push(sortie);
+      });
+
+      console.log(`[getAllSorties] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} sorties for ${sortiesByStage.size} stages`);
+      return sortiesByStage;
+    } catch (error) {
+      console.error('Error fetching all sorties:', error);
+      return new Map();
+    }
+}
+
 export async function getSortieById(sortieId: number): Promise<Sortie | null> {
     const { data, error } = await supabase.from('sorties').select('*').eq('id', sortieId).single();
     if (error) {
@@ -769,6 +802,31 @@ export async function getGamesForStage(stageId: number): Promise<Game[]> {
     return data.map(g => ({ ...g, game_data: g.game_data as any }));
 }
 
+// Nouvelle fonction pour charger tous les jeux en une seule requête
+export async function getAllGames(): Promise<Map<number, Game[]>> {
+    const start = performance.now();
+    const { data, error } = await supabase.from('games').select('*').order('created_at', { ascending: false });
+    const duration = performance.now() - start;
+
+    if (error) {
+        console.error('Error fetching all games:', error);
+        return new Map();
+    }
+
+    const gamesByStage = new Map<number, Game[]>();
+    data?.forEach(g => {
+        if (g.stage_id === null) return; // Skip games without stage_id
+        const game: Game = { ...g, game_data: g.game_data as any };
+        if (!gamesByStage.has(g.stage_id)) {
+            gamesByStage.set(g.stage_id, []);
+        }
+        gamesByStage.get(g.stage_id)!.push(game);
+    });
+
+    console.log(`[getAllGames] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} games for ${gamesByStage.size} stages`);
+    return gamesByStage;
+}
+
 
 export async function getGameById(id: number): Promise<Game | null> {
     const { data, error } = await supabase.from('games').select('*').eq('id', id).single();
@@ -836,6 +894,31 @@ export async function getCompletedObjectives(stageId: number): Promise<string[]>
     return objectiveIds;
 }
 
+// Nouvelle fonction pour charger tous les objectifs complétés en une seule requête
+export async function getAllCompletedObjectives(): Promise<Map<number, string[]>> {
+    const start = performance.now();
+    const { data, error } = await supabase
+        .from('stage_objectives_completion')
+        .select('stage_id, objective_id');
+    const duration = performance.now() - start;
+
+    if (error) {
+        console.error('[getAllCompletedObjectives] Error fetching from Supabase:', error);
+        return new Map();
+    }
+
+    const objectivesByStage = new Map<number, string[]>();
+    data?.forEach(row => {
+        if (!objectivesByStage.has(row.stage_id)) {
+            objectivesByStage.set(row.stage_id, []);
+        }
+        objectivesByStage.get(row.stage_id)!.push(row.objective_id);
+    });
+
+    console.log(`[getAllCompletedObjectives] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} objectives for ${objectivesByStage.size} stages`);
+    return objectivesByStage;
+}
+
 export async function toggleObjectiveCompletion(stageId: number, objectiveId: string, isCompleted: boolean): Promise<boolean> {
     console.log(`[toggleObjectiveCompletion SERVER] stageId=${stageId}, objectiveId=${objectiveId}, isCompleted=${isCompleted}`);
 
@@ -883,6 +966,31 @@ export async function getStageExploits(stageId: number): Promise<Database['publi
         return [];
     }
     return data;
+}
+
+// Nouvelle fonction pour charger tous les exploits en une seule requête
+export async function getAllStageExploits(): Promise<Map<number, Database['public']['Tables']['stages_exploits']['Row'][]>> {
+    const start = performance.now();
+    const { data, error } = await supabase
+        .from('stages_exploits')
+        .select('*');
+    const duration = performance.now() - start;
+
+    if (error) {
+        console.error('Error fetching all stage exploits:', error);
+        return new Map();
+    }
+
+    const exploitsByStage = new Map<number, Database['public']['Tables']['stages_exploits']['Row'][]>();
+    data?.forEach(row => {
+        if (!exploitsByStage.has(row.stage_id)) {
+            exploitsByStage.set(row.stage_id, []);
+        }
+        exploitsByStage.get(row.stage_id)!.push(row);
+    });
+
+    console.log(`[getAllStageExploits] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} exploits for ${exploitsByStage.size} stages`);
+    return exploitsByStage;
 }
 
 export async function addStageExploit(stageId: number, exploitId: string): Promise<boolean> {
@@ -965,6 +1073,32 @@ export async function getStageGameHistory(stageId: number): Promise<StageGameHis
         return [];
     }
     return data;
+}
+
+// Nouvelle fonction pour charger tout l'historique des jeux en une seule requête
+export async function getAllStageGameHistory(): Promise<Map<number, StageGameHistory[]>> {
+    const start = performance.now();
+    const { data, error } = await supabase
+        .from('stage_game_history')
+        .select('*')
+        .order('created_at', { ascending: false });
+    const duration = performance.now() - start;
+
+    if (error) {
+        console.error('Error fetching all stage game history:', error);
+        return new Map();
+    }
+
+    const historyByStage = new Map<number, StageGameHistory[]>();
+    data?.forEach(row => {
+        if (!historyByStage.has(row.stage_id)) {
+            historyByStage.set(row.stage_id, []);
+        }
+        historyByStage.get(row.stage_id)!.push(row);
+    });
+
+    console.log(`[getAllStageGameHistory] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} game history entries for ${historyByStage.size} stages`);
+    return historyByStage;
 }
 
 export async function saveStageGameResult(stageId: number, gameId: number, score: number, total: number, percentage: number, results: any): Promise<boolean> {
