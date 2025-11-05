@@ -89,3 +89,8 @@ Des sections dédiées, conçues pour une utilisation sur ordinateur ("desktop-f
 - **Barre de Navigation Inférieure (Mobile) :** Sur mobile, une barre de navigation standard en bas de l'écran assure un accès rapide aux fonctionnalités principales, garantissant une expérience "mobile-first" optimale.
 - **Profil Utilisateur :** Une page profil permet au moniteur de sauvegarder son nom et son club, informations qui peuvent être réutilisées pour personnaliser les documents générés (comme les fiches de sortie).
 - **Trophées :** Un système de badges ludiques récompense l'utilisateur pour certaines actions clés (ex: "Maître du Programme").
+
+## Licence
+Ce projet est distribué sous licence [CC BY-NC-ND 4.0](LICENSE).  
+© 2025 Artyzia / Stimquest  / Patrick LOUVEL — Tous droits réservés pour un usage commercial.
+
