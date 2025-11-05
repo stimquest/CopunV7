@@ -11,7 +11,7 @@ import { CreateStageForm } from '@/components/create-stage-form';
 import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress, GameCard, PedagogicalContent } from '@/lib/types';
-import { getStages, createStage as serverCreateStage, getSortiesForStage, getGamesForStage, getAllGameCardsFromDb, getPedagogicalContent } from '@/app/actions';
+import { getStages, createStage as serverCreateStage, getSortiesForStage, getGamesForStage, getAllGameCardsFromDb, getPedagogicalContent, getCompletedObjectives, getStageExploits, getStageGameHistory } from '@/app/actions';
 import { supabaseOffline } from '@/lib/supabase-offline';
 import { getStagesOfflineAware, getSortiesForStageOfflineAware, getPedagogicalContentOfflineAware } from '@/lib/offline-actions';
 import { useOnlineStatus } from '@/hooks/use-online-status';
@@ -211,8 +211,12 @@ export default function StageManagerPage() {
         // Utiliser le système offline pour les stages
         const stagesData = await getStagesOfflineAware();
         const [gameCardsData, pedagogicalContent] = await Promise.all([getAllGameCardsFromDb(), getPedagogicalContentOfflineAware()]);
-        setAllDbGameCards(gameCardsData);
-        setAllPedagogicalContent(pedagogicalContent);
+        setAllDbGameCards(gameCardsData || []);
+        setAllPedagogicalContent(pedagogicalContent || []);
+
+        // Utiliser les variables locales dans le map pour éviter les problèmes de timing
+        const localGameCards = gameCardsData || [];
+        const localPedagogicalContent = pedagogicalContent || [];
 
         const stagesWithProgressData: StageWithProgress[] = await Promise.all(
             (stagesData || []).map(async (stage) => {
@@ -231,27 +235,28 @@ export default function StageManagerPage() {
                 // --- Calculate objectives progress ---
                 if (programSortie && programSortie.selected_content.program) {
                     const programObjectiveIds = new Set(programSortie.selected_content.program);
-                    
-                    const completedFromStorage = typeof window !== 'undefined' ? localStorage.getItem(`completed_objectives_${stage.id}`) : null;
-                    const completedIds = completedFromStorage ? new Set(JSON.parse(completedFromStorage)) : new Set();
+
+                    // Récupérer les objectifs complétés depuis Supabase
+                    const completedObjectivesFromDb = await getCompletedObjectives(stage.id);
+                    const completedIds = new Set(completedObjectivesFromDb);
                     
                     const allThemeIdsInProgram = new Set<string>();
 
                     programObjectiveIds.forEach(objId => {
-                        const content = allPedagogicalContent.find(c => c.id.toString() === objId);
+                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
                         if(content) {
                             content.tags_theme.forEach(themeId => allThemeIdsInProgram.add(themeId));
                         }
                     });
 
                     mainThemes = Array.from(allThemeIdsInProgram).map(themeId => allThemes.find(t => t.id === themeId)).filter((t): t is GrandTheme => !!t);
-                    
+
                     mainThemes.forEach(theme => {
                         objectivesProgress[theme.title] = { completed: 0, total: 0 };
                     });
 
                     programObjectiveIds.forEach(objId => {
-                        const content = allPedagogicalContent.find(c => c.id.toString() === objId);
+                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
                         if(content) {
                             mainThemes.forEach(theme => {
                                 if (content.tags_theme.includes(theme.id)) {
@@ -269,43 +274,43 @@ export default function StageManagerPage() {
                 }
                 
                 // --- Calculate defis progress ---
-                const storedAssignedDefis = typeof window !== 'undefined' ? localStorage.getItem(`assigned_defis_${stage.id}`) : null;
-                const assignedDefis: AssignedDefi[] = storedAssignedDefis ? JSON.parse(storedAssignedDefis) : [];
-                defisProgress.total = assignedDefis.length;
-                defisProgress.completed = assignedDefis.filter(m => m.status === 'complete').length;
+                const stageExploits = await getStageExploits(stage.id);
+                defisProgress.total = stageExploits.length;
+                defisProgress.completed = stageExploits.filter(e => e.status === 'complete').length;
 
                 // --- Calculate games/quiz progress ---
-                const storedGamesHistory = typeof window !== 'undefined' ? localStorage.getItem(`game_history_${stage.id}`) : null;
-                if (storedGamesHistory) {
-                    const history: { gameId: number; results?: any[] }[] = JSON.parse(storedGamesHistory);
-                    
+                const gameHistory = await getStageGameHistory(stage.id);
+                if (gameHistory.length > 0) {
                     let totalCorrect = 0;
                     let totalQuestions = 0;
                     const themeScores: Record<string, ThemeScore> = {};
 
-                    history.forEach(gameRun => {
-                        const game = games.find(g => g.id === gameRun.gameId);
-                        if (!game) return;
+                    gameHistory.forEach(entry => {
+                        // Ajouter le score global
+                        totalCorrect += entry.score;
+                        totalQuestions += entry.total;
 
-                        if (gameRun.results && Array.isArray(gameRun.results)) {
-                            gameRun.results.forEach((result: { cardId: number; isCorrect: boolean }) => {
-                                const card = allDbGameCards.find(c => c.id === result.cardId);
-                                if (card) {
-                                    totalQuestions++;
-                                    if (result.isCorrect) totalCorrect++;
+                        // Analyser les résultats par thème si disponibles
+                        if (entry.results && Array.isArray(entry.results)) {
+                            (entry.results as any[]).forEach((result: any) => {
+                                // Essayer de trouver le thème depuis la carte
+                                const card = localGameCards.find(c => c.id === result.cardId);
+                                const theme = card?.theme || result.theme || 'Inconnu';
 
-                                    if (!themeScores[card.theme]) {
-                                        themeScores[card.theme] = { correct: 0, total: 0 };
-                                    }
-                                    themeScores[card.theme].total++;
+                                if (!themeScores[theme]) {
+                                    themeScores[theme] = { correct: 0, total: 0 };
+                                }
+
+                                if (result.isCorrect !== undefined) {
+                                    themeScores[theme].total++;
                                     if (result.isCorrect) {
-                                        themeScores[card.theme].correct++;
+                                        themeScores[theme].correct++;
                                     }
                                 }
                             });
                         }
                     });
-                    
+
                     if (totalQuestions > 0) {
                         gamesProgress.averageScore = Math.round((totalCorrect / totalQuestions) * 100);
                     }
@@ -338,6 +343,19 @@ export default function StageManagerPage() {
             fetchStages(); // Recharger les données
         }
     }, [isOnline, wasOffline]);
+
+    // Recharger les stages lorsque la fenêtre regagne le focus pour synchroniser le localStorage
+    useEffect(() => {
+        const handleFocus = () => {
+            // Recharger uniquement si nous ne sommes pas déjà en train de charger
+            if (!loading) {
+                fetchStages();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, [loading]);
 
     const { currentStages, upcomingStages, pastStages } = useMemo(() => {
         const today = startOfToday();

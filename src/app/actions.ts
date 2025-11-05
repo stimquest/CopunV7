@@ -2,7 +2,8 @@
 
 'use server';
 
-import type { ContextData, GroupProfile, Sortie, Stage, ContentCard, EtagesData, SelectedNotions, SelectedContent, CardPriority, Observation, Game, GameData, GameCardGeneratorOutput, GameCard, TriageCard, MotsEnRafaleCard, DilemmeDuMarinCard, DbGameCard, TriageItem, MotsEnRafaleItem, DilemmeDuMarinItem, QuizzCard, QuizzItem, GameCardType, DbGameCardData, ProgramAxe, ProgramSelections, Option, QuizAttempt, PedagogicalContent } from '@/lib/types';
+import type { ContextData, GroupProfile, Sortie, Stage, ContentCard, EtagesData, SelectedNotions, SelectedContent, CardPriority, Observation, Game, GameData, GameCard, TriageCard, MotsEnRafaleCard, DilemmeDuMarinCard, DbGameCard, TriageItem, MotsEnRafaleItem, DilemmeDuMarinItem, QuizzCard, QuizzItem, GameCardType, DbGameCardData, ProgramAxe, ProgramSelections, Option, QuizAttempt, PedagogicalContent, DefiStatus, StageGameHistory } from '@/lib/types';
+import type { Database } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -87,7 +88,7 @@ export async function deleteStage(stageId: number) {
     // Then, delete the stage itself
     const { error: stageError } = await supabase.from('stages').delete().eq('id', stageId);
     if (stageError) {
-        console.error('Error deleting stage:', error);
+        console.error('Error deleting stage:', stageError);
         return false;
     }
     revalidatePath('/stages');
@@ -105,8 +106,8 @@ export async function getSortiesForStage(stageId: number): Promise<Sortie[]> {
       }
       return data.map(s => ({
           ...s,
-          selected_notions: s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 },
-          selected_content: s.selected_content || {},
+          selected_notions: (s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
+          selected_content: (s.selected_content || {}) as Partial<SelectedContent>,
       }));
     } catch (error) {
       console.error('Error fetching sorties:', error);
@@ -120,10 +121,10 @@ export async function getSortieById(sortieId: number): Promise<Sortie | null> {
         console.error('Error fetching sortie:', error);
         return null;
     }
-    return { 
-        ...data, 
-        selected_notions: data.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 },
-        selected_content: data.selected_content || {},
+    return {
+        ...data,
+        selected_notions: (data.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
+        selected_content: (data.selected_content || {}) as Partial<SelectedContent>,
     };
 }
 
@@ -260,7 +261,7 @@ export async function saveOrUpdateProgramForStage(
 
     const sortieTitle = `Programme: ${mainThemeTitles.join(', ').substring(0,50)}...`
 
-    const promises: Promise<any>[] = [];
+    const promises = [];
     for (const day of stageDays) {
         const dateISO = format(day, 'yyyy-MM-dd');
         const sortieData = {
@@ -269,7 +270,7 @@ export async function saveOrUpdateProgramForStage(
             title: sortieTitle,
             themes: mainThemeTitles,
             duration: totalDuration,
-            summary: memoContent.substring(0, 150) + (memoContent.length > 150 ? '...' : ''), 
+            summary: memoContent.substring(0, 150) + (memoContent.length > 150 ? '...' : ''),
             content: memoContent,
             selected_notions: selectedNotions as any,
             selected_content: selectedContent as any,
@@ -518,7 +519,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 1,
                 theme: "Repères spatio-temporels",
                 related_objective_id: "1"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -528,7 +529,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 1,
                 theme: "Repères spatio-temporels",
                 related_objective_id: "6"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -538,7 +539,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 3,
                 theme: "Repères spatio-temporels",
                 related_objective_id: "7"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -548,7 +549,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 1,
                 theme: "Caractéristiques du littoral",
                 related_objective_id: "4"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -558,7 +559,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 2,
                 theme: "Interactions des éléments climatiques",
                 related_objective_id: "9"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -568,7 +569,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 3,
                 theme: "Repères spatio-temporels",
                 related_objective_id: "10"
-            } as QuizzItem
+            } as any
         },
         {
             type: 'quizz',
@@ -578,7 +579,7 @@ async function seedInitialGameCards() {
                 correctAnswerIndex: 2,
                 theme: "Lecture du paysage",
                 related_objective_id: "14"
-            } as QuizzItem
+            } as any
         }
     ];
 
@@ -614,9 +615,9 @@ const convertDbToGameCard = (dbCard: DbGameCard): GameCard | null => {
 
     // Ajouter un thème par défaut si manquant
     const enrichedData = {
-        theme: 'Général', // Thème par défaut
-        ...cardData
-    };
+        ...cardData,
+        theme: (cardData as any).theme || 'Général', // Assurer qu'un thème est présent
+    } as any; // Cast to any to allow dynamic properties like 'theme'
 
     return {
         id: dbCard.id,
@@ -731,7 +732,7 @@ export async function createGame(title: string, theme: string, gameData: GameDat
     const { data, error } = await supabase.from('games').insert({
         title,
         theme,
-        game_data: gameData,
+        game_data: gameData as any, // Cast to any to handle JSON type mismatch
         stage_id: stageId,
     }).select().single();
 
@@ -743,7 +744,7 @@ export async function createGame(title: string, theme: string, gameData: GameDat
     if (stageId) {
         revalidatePath(`/stages/${stageId}`);
     }
-    return data;
+    return { ...data, game_data: data.game_data as unknown as GameData }; // Ensure return type is correct
 }
 
 export async function getGames(): Promise<Game[]> {
@@ -814,4 +815,185 @@ export async function getQuizAttemptsForUser(userId: string): Promise<QuizAttemp
         return [];
     }
     return data;
+}
+
+// --- STAGE PROGRESSION ACTIONS ---
+
+// 1. OBJECTIVES COMPLETION
+export async function getCompletedObjectives(stageId: number): Promise<string[]> {
+    const { data, error } = await supabase
+        .from('stage_objectives_completion')
+        .select('objective_id')
+        .eq('stage_id', stageId);
+
+    if (error) {
+        console.error('[getCompletedObjectives] Error fetching from Supabase:', error);
+        return [];
+    }
+
+    const objectiveIds = data ? data.map(row => row.objective_id) : [];
+    console.log(`[getCompletedObjectives] Loaded ${objectiveIds.length} objectives from DB for stage ${stageId}`);
+    return objectiveIds;
+}
+
+export async function toggleObjectiveCompletion(stageId: number, objectiveId: string, isCompleted: boolean): Promise<boolean> {
+    console.log(`[toggleObjectiveCompletion SERVER] stageId=${stageId}, objectiveId=${objectiveId}, isCompleted=${isCompleted}`);
+
+    if (isCompleted) {
+        // Insert completion record
+        const { error } = await supabase
+            .from('stage_objectives_completion')
+            .insert({ stage_id: stageId, objective_id: objectiveId, completed_at: new Date().toISOString() });
+
+        if (error) {
+            console.error('[toggleObjectiveCompletion SERVER] Error inserting to Supabase:', error);
+            return false;
+        }
+        console.log(`[toggleObjectiveCompletion SERVER] Successfully inserted to Supabase`);
+    } else {
+        // Delete completion record
+        const { error } = await supabase
+            .from('stage_objectives_completion')
+            .delete()
+            .eq('stage_id', stageId)
+            .eq('objective_id', objectiveId);
+
+        if (error) {
+            console.error('[toggleObjectiveCompletion SERVER] Error deleting from Supabase:', error);
+            return false;
+        }
+        console.log(`[toggleObjectiveCompletion SERVER] Successfully deleted from Supabase`);
+    }
+
+    revalidatePath(`/stages/${stageId}`);
+    revalidatePath('/stages');
+    return true;
+}
+
+
+// 2. DEFIS/EXPLOITS PROGRESS
+export async function getStageExploits(stageId: number): Promise<Database['public']['Tables']['stages_exploits']['Row'][]> {
+    const { data, error } = await supabase
+        .from('stages_exploits')
+        .select('*')
+        .eq('stage_id', stageId);
+
+    if (error) {
+        console.error('Error fetching stage exploits:', error);
+        return [];
+    }
+    return data;
+}
+
+export async function addStageExploit(stageId: number, exploitId: string): Promise<boolean> {
+    // Check if already exists
+    const { data: existing } = await supabase
+        .from('stages_exploits')
+        .select('id')
+        .eq('stage_id', stageId)
+        .eq('exploit_id', exploitId)
+        .single();
+
+    if (existing) {
+        console.log('Exploit already assigned to stage');
+        return true; // Already exists, no error
+    }
+
+    const { error } = await supabase
+        .from('stages_exploits')
+        .insert({
+            stage_id: stageId,
+            exploit_id: exploitId,
+            status: 'en_cours',
+        });
+
+    if (error) {
+        console.error('Error adding stage exploit:', error);
+        return false;
+    }
+    revalidatePath(`/stages/${stageId}`);
+    revalidatePath('/stages');
+    return true;
+}
+
+export async function removeStageExploit(stageId: number, exploitId: string): Promise<boolean> {
+    const { error } = await supabase
+        .from('stages_exploits')
+        .delete()
+        .eq('stage_id', stageId)
+        .eq('exploit_id', exploitId);
+
+    if (error) {
+        console.error('Error removing stage exploit:', error);
+        return false;
+    }
+    revalidatePath(`/stages/${stageId}`);
+    revalidatePath('/stages');
+    return true;
+}
+
+export async function updateStageExploitStatus(stageId: number, exploitId: string, status: DefiStatus, preuveUrl: string | null = null): Promise<boolean> {
+    const { error } = await supabase
+        .from('stages_exploits')
+        .update({
+            status: status,
+            completed_at: status === 'complete' ? new Date().toISOString() : null,
+            preuves_url: preuveUrl ? [preuveUrl] : null, // Assuming preuves_url is an array of strings (Json)
+        })
+        .eq('stage_id', stageId)
+        .eq('exploit_id', exploitId);
+
+    if (error) {
+        console.error('Error updating stage exploit status:', error);
+        return false;
+    }
+    revalidatePath(`/stages/${stageId}`);
+    revalidatePath('/stages');
+    return true;
+}
+
+// 3. GAME HISTORY
+export async function getStageGameHistory(stageId: number): Promise<StageGameHistory[]> {
+    const { data, error } = await supabase
+        .from('stage_game_history')
+        .select('*')
+        .eq('stage_id', stageId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching stage game history:', error);
+        return [];
+    }
+    return data;
+}
+
+export async function saveStageGameResult(stageId: number, gameId: number, score: number, total: number, percentage: number, results: any): Promise<boolean> {
+    console.log('[saveStageGameResult] Attempting to save:', { stageId, gameId, score, total, percentage, resultsCount: results?.length });
+
+    const { data, error } = await supabase
+        .from('stage_game_history')
+        .insert({
+            stage_id: stageId,
+            game_id: gameId,
+            score: score,
+            total: total,
+            percentage: percentage,
+            results: results,
+        })
+        .select();
+
+    if (error) {
+        console.error('[saveStageGameResult] Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+        });
+        return false;
+    }
+
+    console.log('[saveStageGameResult] Successfully saved:', data);
+    revalidatePath(`/stages/${stageId}`);
+    revalidatePath('/stages');
+    return true;
 }

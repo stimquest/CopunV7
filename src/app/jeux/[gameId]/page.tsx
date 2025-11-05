@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getGameById, getFilteredGameCards, saveQuizAttempt, getPedagogicalContent } from '@/app/actions';
+import { getGameById, getFilteredGameCards, saveQuizAttempt, getPedagogicalContent, saveStageGameResult } from '@/app/actions';
 import type { Game, GameCard, TriageCard, MotsEnRafaleCard, DilemmeDuMarinCard, QuizzCard, GameCardType, ContentCard, QuizAttempt, PedagogicalContent } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -145,8 +145,30 @@ function GameDisplayPage() {
         }
         
         // Save game result for the group/stage
-        if (gameMode === 'play' && game) {
+        if (gameMode === 'play' && game && game.stage_id) {
             const finalAnswerResults = [...answerResults, ...(wasCorrect !== undefined ? [{ cardId: currentCard.id, isCorrect: wasCorrect }] : [])];
+
+            // Sauvegarder dans Supabase
+            saveStageGameResult(
+                game.stage_id,
+                game.id,
+                finalScore,
+                totalScorable,
+                percentage,
+                finalAnswerResults
+            ).then(success => {
+                if (success) {
+                    console.log('[Game] Result saved to database successfully');
+                } else {
+                    console.error('[Game] Failed to save result to database');
+                }
+            }).catch(error => {
+                console.error('[Game] Error saving result:', error);
+            });
+
+            // Garder aussi dans localStorage pour compatibilité/offline
+            const historyKey = `game_history_${game.stage_id}`;
+            const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
             const gameResult = {
                 gameId: game.id,
                 stageId: game.stage_id,
@@ -156,10 +178,6 @@ function GameDisplayPage() {
                 date: new Date().toISOString(),
                 results: finalAnswerResults
             };
-
-            const historyKey = `game_history_${game.stage_id}`;
-            const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
-            
             history.push(gameResult);
             localStorage.setItem(historyKey, JSON.stringify(history));
 

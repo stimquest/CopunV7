@@ -84,9 +84,9 @@ export type SelectedNotions = {
 };
 
 export type SelectedContent = {
-  [optionId: string]: string[]; // Array of selected card IDs for each option
   program?: string[];
   themes?: string[];
+  [optionId: string]: string[] | undefined; // Array of selected card IDs for each option
 };
 
 export type GroupProfile = {
@@ -251,6 +251,10 @@ export interface BadgeInfo {
 
 // Formation / Quiz types
 export type QuizAttempt = Database['public']['Tables']['quiz_attempts']['Row'];
+
+// Progression types (Stage-specific)
+export type StageObjectiveCompletion = Database['public']['Tables']['stage_objectives_completion']['Row'];
+export type StageGameHistory = Database['public']['Tables']['stage_game_history']['Row'];
 
 // --- Defis & Exploits ---
 export type DefiStatus = 'en_cours' | 'complete';

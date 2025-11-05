@@ -1,11 +1,12 @@
 
 'use client';
 
-import React, { useState, useEffect, useTransition, useMemo } from 'react';
-import type { Defi, AssignedDefi, StageType, Exploit } from '@/lib/types';
+import React, { useState, useEffect, useTransition, useMemo, useCallback } from 'react';
+import type { Defi, AssignedDefi, StageType, Exploit, DefiStatus } from '@/lib/types';
 import { allDefis } from '@/data/defis';
 import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
+import { getStageExploits, addStageExploit, removeStageExploit, updateStageExploitStatus } from '@/app/actions';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -38,10 +39,22 @@ export function DefisTab({ stageId, stageType, stageThemes }: DefisTabProps) {
     const [justCompletedExploits, setJustCompletedExploits] = useState<Exploit[]>([]);
     const [defiToProve, setDefiToProve] = useState<{assignedDefi: AssignedDefi, defi: Defi} | null>(null);
 
-    useEffect(() => {
-        const storedAssignedDefis = localStorage.getItem(`assigned_defis_${stageId}`);
-        setAssignedDefis(storedAssignedDefis ? JSON.parse(storedAssignedDefis) : []);
+    const fetchDefis = useCallback(async () => {
+        const dbExploits = await getStageExploits(stageId);
+        const mappedDefis: AssignedDefi[] = dbExploits.map(e => ({
+            id: e.id,
+            stage_id: e.stage_id,
+            defi_id: e.exploit_id,
+            status: e.status as DefiStatus,
+            completed_at: e.completed_at,
+            preuve_url: (e.preuves_url as string[] | null)?.[0] || null,
+        }));
+        setAssignedDefis(mappedDefis);
     }, [stageId]);
+
+    useEffect(() => {
+        fetchDefis();
+    }, [fetchDefis]);
 
     const assignedDefiIds = useMemo(() => new Set(assignedDefis.map(am => am.defi_id)), [assignedDefis]);
     
@@ -70,59 +83,46 @@ export function DefisTab({ stageId, stageType, stageThemes }: DefisTabProps) {
 
 
     const handleAssignDefi = (defiId: string) => {
-        startTransition(() => {
-            const defiToAdd = allDefis.find(e => e.id === defiId);
-            if (!defiToAdd) return;
-            
-            const newAssignedDefi: AssignedDefi = {
-                id: Date.now(),
-                stage_id: stageId,
-                defi_id: defiId,
-                status: 'en_cours',
-                completed_at: null,
-                preuve_url: null
-            };
-            const updatedDefis = [...assignedDefis, newAssignedDefi];
-            setAssignedDefis(updatedDefis);
-            localStorage.setItem(`assigned_defis_${stageId}`, JSON.stringify(updatedDefis));
-            toast({ title: "Défi assigné" });
+        startTransition(async () => {
+            const success = await addStageExploit(stageId, defiId);
+            if (success) {
+                toast({ title: "Défi assigné" });
+                fetchDefis();
+            } else {
+                toast({ title: "Erreur", description: "Impossible d'assigner le défi", variant: 'destructive' });
+            }
         });
     };
 
-    const handleUnassignDefi = (assignedDefiId: number) => {
-        startTransition(() => {
-            const updatedDefis = assignedDefis.filter(am => am.id !== assignedDefiId);
-            setAssignedDefis(updatedDefis);
-            localStorage.setItem(`assigned_defis_${stageId}`, JSON.stringify(updatedDefis));
-            toast({ title: "Défi retiré" });
+    const handleUnassignDefi = (assignedDefi: AssignedDefi) => {
+        startTransition(async () => {
+            const success = await removeStageExploit(stageId, assignedDefi.defi_id);
+            if (success) {
+                toast({ title: "Défi retiré" });
+                fetchDefis();
+            } else {
+                toast({ title: "Erreur", description: "Impossible de retirer le défi", variant: 'destructive' });
+            }
         });
     };
 
     const handleUpdateDefi = (assignedDefi: AssignedDefi, completed: boolean, preuveUrl?: string) => {
-        startTransition(() => {
+        startTransition(async () => {
             const defiDetails = allDefis.find(m => m.id === assignedDefi.defi_id);
             if (!defiDetails) return;
 
-            let justCompletedNow = false;
-            
-            const updatedDefis = assignedDefis.map(am => {
-                if (am.id === assignedDefi.id) {
-                     const wasCompleted = am.status === 'complete';
-                     if (completed && !wasCompleted) {
-                        justCompletedNow = true;
-                     }
-                    return {
-                        ...am,
-                        status: completed ? 'complete' : 'en_cours',
-                        completed_at: completed ? new Date().toISOString() : null,
-                        preuve_url: preuveUrl !== undefined ? preuveUrl : am.preuve_url,
-                    };
-                }
-                return am;
-            });
-            
-            setAssignedDefis(updatedDefis);
-            localStorage.setItem(`assigned_defis_${stageId}`, JSON.stringify(updatedDefis));
+            const newStatus: DefiStatus = completed ? 'complete' : 'en_cours';
+            const finalPreuveUrl = preuveUrl !== undefined ? preuveUrl : assignedDefi.preuve_url;
+
+            const success = await updateStageExploitStatus(assignedDefi.stage_id, assignedDefi.defi_id, newStatus, finalPreuveUrl);
+
+            if (!success) {
+                toast({ title: "Erreur", description: "Échec de la mise à jour du défi.", variant: 'destructive' });
+                return;
+            }
+
+            const wasCompleted = assignedDefi.status === 'complete';
+            const justCompletedNow = completed && !wasCompleted;
 
             if (justCompletedNow) {
                  // Add defi to user's global log
@@ -153,8 +153,9 @@ export function DefisTab({ stageId, stageType, stageThemes }: DefisTabProps) {
             } else {
                  toast({ title: "Progression mise à jour" });
             }
-            
+
             setDefiToProve(null);
+            fetchDefis();
         });
     };
     
@@ -215,7 +216,7 @@ export function DefisTab({ stageId, stageType, stageThemes }: DefisTabProps) {
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
                                                 <AlertDialogHeader><AlertDialogTitle>Retirer le défi ?</AlertDialogTitle><AlertDialogDescription>La progression sera perdue.</AlertDialogDescription></AlertDialogHeader>
-                                                <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignDefi(assignedDefi.id)}>Confirmer</AlertDialogAction></AlertDialogFooter>
+                                                <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignDefi(assignedDefi)}>Confirmer</AlertDialogAction></AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
                                     </div>

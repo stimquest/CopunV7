@@ -18,9 +18,9 @@ import { ChevronLeft, PlusCircle, Calendar as CalendarIcon, Users, Gamepad2, Set
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Stage, Sortie, Game, EtagesData, ContentCard, Option, GrandTheme, StageType, Defi, AssignedDefi, PedagogicalContent } from '@/lib/types';
+import type { Stage, Sortie, Game, EtagesData, ContentCard, Option, GrandTheme, StageType, Defi, AssignedDefi, PedagogicalContent, DefiStatus, StageGameHistory } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { getStageById, getSortiesForStage, saveOrUpdateProgramForStage, getGamesForStage, getEtagesData, deleteStage, updateStage, getPedagogicalContent } from '@/app/actions';
+import { getStageById, getSortiesForStage, saveOrUpdateProgramForStage, getGamesForStage, getEtagesData, deleteStage, updateStage, getPedagogicalContent, getCompletedObjectives, toggleObjectiveCompletion, getStageExploits, updateStageExploitStatus, getStageGameHistory, deleteGame } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { groupedThemes } from '@/data/etages';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,6 +62,7 @@ export default function StageDetailPage() {
     const router = useRouter();
     const params = useParams();
     const stageId = params.stageId ? parseInt(params.stageId as string, 10) : null;
+    const { toast } = useToast();
 
     // --- State for Stage Data ---
     const [stage, setStage] = useState<Stage | null>(null);
@@ -73,7 +74,7 @@ export default function StageDetailPage() {
 
     // --- State for UI ---
     const [activeTab, setActiveTab] = useState<'suivi' | 'programme' | 'ressources'>('suivi');
-    
+
     // --- State for Objectives Tab ---
     const [allObjectives, setAllObjectives] = useState<PedagogicalContent[]>([]);
     const [completedObjectives, setCompletedObjectives] = useState<Set<string>>(new Set());
@@ -99,12 +100,13 @@ export default function StageDetailPage() {
         setLoading(true);
         setError(null);
         try {
-            const [stageData, sortiesData, gamesData, etages, allPedagogicalContent] = await Promise.all([
+            const [stageData, sortiesData, gamesData, etages, allPedagogicalContent, completedObjectivesIds] = await Promise.all([
                 getStageById(stageId),
                 getSortiesForStage(stageId),
                 getGamesForStage(stageId),
                 getEtagesData(),
                 getPedagogicalContent(),
+                getCompletedObjectives(stageId), // Fetch completed objectives from DB
             ]);
             
             if (!stageData || !etages) {
@@ -127,9 +129,30 @@ export default function StageDetailPage() {
             } else {
                  setAllObjectives([]);
             }
-            
-            const completedFromStorage = localStorage.getItem(`completed_objectives_${stageId}`);
-            if (completedFromStorage) setCompletedObjectives(new Set(JSON.parse(completedFromStorage)));
+
+            // Charger les objectifs complétés depuis localStorage en priorité, puis depuis la DB
+            let finalCompletedObjectives: string[] = completedObjectivesIds;
+
+            if (stageId) {
+                const localStorageData = localStorage.getItem(`stage_${stageId}_completed_objectives`);
+                if (localStorageData) {
+                    try {
+                        const localObjectives = JSON.parse(localStorageData) as string[];
+                        console.log(`[fetchData] Loaded from localStorage:`, localObjectives);
+                        finalCompletedObjectives = localObjectives;
+                    } catch (error) {
+                        console.error(`[fetchData] Error parsing localStorage:`, error);
+                    }
+                } else {
+                    console.log(`[fetchData] No localStorage data, using DB data:`, completedObjectivesIds);
+                    // Sauvegarder les données de la DB dans localStorage pour la prochaine fois
+                    if (completedObjectivesIds.length > 0) {
+                        localStorage.setItem(`stage_${stageId}_completed_objectives`, JSON.stringify(completedObjectivesIds));
+                    }
+                }
+            }
+
+            setCompletedObjectives(new Set(finalCompletedObjectives));
 
 
         } catch (err) {
@@ -144,11 +167,47 @@ export default function StageDetailPage() {
         fetchData();
     }, [fetchData]);
 
-    const onToggleObjective = (cardId: string) => {
+    const onToggleObjective = async (cardId: string) => {
+        const isCurrentlyCompleted = completedObjectives.has(cardId);
         const newSet = new Set(completedObjectives);
-        newSet.has(cardId) ? newSet.delete(cardId) : newSet.add(cardId);
+
+        if (isCurrentlyCompleted) {
+            newSet.delete(cardId);
+        } else {
+            newSet.add(cardId);
+        }
+
+        // Mettre à jour l'état local immédiatement
         setCompletedObjectives(newSet);
-        if (stageId) localStorage.setItem(`completed_objectives_${stageId}`, JSON.stringify(Array.from(newSet)));
+
+        // Sauvegarder dans localStorage pour persistance immédiate
+        if (stageId) {
+            const objectivesArray = Array.from(newSet);
+            localStorage.setItem(`stage_${stageId}_completed_objectives`, JSON.stringify(objectivesArray));
+            console.log(`[onToggleObjective] Saved to localStorage:`, objectivesArray);
+
+            // Mettre à jour la base de données via Server Action
+            try {
+                const success = await toggleObjectiveCompletion(stageId, cardId, !isCurrentlyCompleted);
+                if (success) {
+                    console.log(`[onToggleObjective] Successfully saved to database`);
+                } else {
+                    console.error(`[onToggleObjective] Failed to save to database`);
+                    toast({
+                        title: "Erreur de sauvegarde",
+                        description: "L'objectif a été sauvegardé localement mais pas dans la base de données.",
+                        variant: "destructive"
+                    });
+                }
+            } catch (error) {
+                console.error(`[onToggleObjective] Error saving to database:`, error);
+                toast({
+                    title: "Erreur de sauvegarde",
+                    description: "L'objectif a été sauvegardé localement mais pas dans la base de données.",
+                    variant: "destructive"
+                });
+            }
+        }
     };
     
 
@@ -197,10 +256,9 @@ export default function StageDetailPage() {
                         </div>
                     </CardHeader>
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
-                      <TabsList className="grid w-full grid-cols-3 bg-white/10 border-white/20 text-white">
+                      <TabsList className="grid w-full grid-cols-2 bg-white/10 border-white/20 text-white">
                         <TabsTrigger value="suivi" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground"><ListChecks className="mr-2 h-4 w-4"/>Suivi</TabsTrigger>
                         <TabsTrigger value="programme" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground"><FileText className="mr-2 h-4 w-4"/>Programme</TabsTrigger>
-                        <TabsTrigger value="ressources" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground"><Library className="mr-2 h-4 w-4"/>Ressources</TabsTrigger>
                       </TabsList>
                     </Tabs>
                 </CardContent>
@@ -216,24 +274,20 @@ export default function StageDetailPage() {
                         onToggleObjective={onToggleObjective}
                     />
                 )}
-                 {activeTab === 'programme' && (
+                 {activeTab === 'programme' && stageId && (
                    <ProgrammeBuilder
                         stage={stage}
                         sorties={sorties}
                         etagesData={etagesData}
+                        stageId={stageId}
+                        stageType={stage.type as StageType}
+                        stageThemes={programThemes}
                         onSave={(newlySelectedCards) => {
                             setAllObjectives(newlySelectedCards);
-                            fetchData(); 
+                            fetchData();
                         }}
                     />
                  )}
-                {activeTab === 'ressources' && stageId && (
-                    <RessourcesView
-                       stageId={stageId}
-                       stageType={stage.type as StageType}
-                       stageThemes={programThemes}
-                    />
-                )}
             </div>
         </div>
     )
@@ -337,37 +391,41 @@ const ObjectivesView = ({
     return (
         <div className="space-y-8">
             <Card>
-                <CardHeader><CardTitle>Objectifs Pédagogiques</CardTitle></CardHeader>
-                <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-full sm:w-auto">
-                                <ListFilter className="mr-2 h-4 w-4" />
-                                Thèmes {activeThemeFilters.length > 0 && `(${activeThemeFilters.length})`}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuLabel>Filtrer par thème</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {themesInProgram.map(theme => (
-                                <DropdownMenuCheckboxItem
-                                    key={theme.id}
-                                    checked={activeThemeFilters.includes(theme.id)}
-                                    onCheckedChange={() => handleThemeFilterToggle(theme.id)}
-                                >
-                                    {theme.title}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                     </DropdownMenu>
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <CardTitle className="text-xl">Objectifs Pédagogiques</CardTitle>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                                        <ListFilter className="mr-2 h-4 w-4" />
+                                        Thèmes {activeThemeFilters.length > 0 && `(${activeThemeFilters.length})`}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuLabel>Filtrer par thème</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {themesInProgram.map(theme => (
+                                        <DropdownMenuCheckboxItem
+                                            key={theme.id}
+                                            checked={activeThemeFilters.includes(theme.id)}
+                                            onCheckedChange={() => handleThemeFilterToggle(theme.id)}
+                                        >
+                                            {theme.title}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
-                     <div className="flex items-center space-x-2">
-                        <Checkbox id="show-not-seen" checked={showOnlyNotSeen} onCheckedChange={(checked) => setShowOnlyNotSeen(!!checked)} />
-                        <label htmlFor="show-not-seen" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Afficher uniquement les non vus
-                        </label>
+                            <div className="flex items-center space-x-2">
+                                <Switch id="show-not-seen" checked={showOnlyNotSeen} onCheckedChange={setShowOnlyNotSeen} />
+                                <Label htmlFor="show-not-seen" className="text-sm font-medium cursor-pointer">
+                                    Non vus uniquement
+                                </Label>
+                            </div>
+                        </div>
                     </div>
-                </CardContent>
+                </CardHeader>
             </Card>
 
             {Object.entries(objectivesByPillar).map(([pillar, cards]) => {
@@ -446,10 +504,23 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
 
     const [assignedDefis, setAssignedDefis] = useState<AssignedDefi[]>([]);
     
-    useEffect(() => {
-        const storedAssignedDefis = localStorage.getItem(`assigned_defis_${stageId}`);
-        setAssignedDefis(storedAssignedDefis ? JSON.parse(storedAssignedDefis) : []);
+    const fetchDefis = useCallback(async () => {
+        const dbExploits = await getStageExploits(stageId);
+        // Mapping DB exploits to AssignedDefi (assuming AssignedDefi is the local representation of stages_exploits)
+        const mappedDefis: AssignedDefi[] = dbExploits.map(e => ({
+            id: e.id,
+            stage_id: e.stage_id,
+            defi_id: e.exploit_id,
+            status: e.status as DefiStatus,
+            completed_at: e.completed_at,
+            preuve_url: (e.preuves_url as string[] | null)?.[0] || null, // Assuming single proof URL for simplicity
+        }));
+        setAssignedDefis(mappedDefis);
     }, [stageId]);
+
+    useEffect(() => {
+        fetchDefis();
+    }, [fetchDefis]);
     
     const assignedDefisDetails = useMemo(() => {
         return assignedDefis
@@ -461,22 +532,19 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
     }, [assignedDefis]);
 
     const handleUpdateDefi = (assignedDefi: AssignedDefi, completed: boolean, preuveUrl?: string) => {
-        startTransition(() => {
-            const updatedDefis = assignedDefis.map(am => {
-                if (am.id === assignedDefi.id) {
-                    return {
-                        ...am,
-                        status: completed ? 'complete' : 'en_cours',
-                        completed_at: completed ? new Date().toISOString() : null,
-                        preuve_url: preuveUrl !== undefined ? preuveUrl : am.preuve_url,
-                    };
-                }
-                return am;
-            });
+        startTransition(async () => {
+            const newStatus: DefiStatus = completed ? 'complete' : 'en_cours';
+            const finalPreuveUrl = preuveUrl !== undefined ? preuveUrl : assignedDefi.preuve_url;
+
+            const success = await updateStageExploitStatus(assignedDefi.stage_id, assignedDefi.defi_id, newStatus, finalPreuveUrl);
             
-            setAssignedDefis(updatedDefis);
-            localStorage.setItem(`assigned_defis_${stageId}`, JSON.stringify(updatedDefis));
-            toast({ title: "Progression du défi mise à jour" });
+            if (success) {
+                toast({ title: "Progression du défi mise à jour" });
+                // Recharger les données pour mettre à jour l'état local et la page d'accueil
+                fetchDefis();
+            } else {
+                toast({ title: "Erreur", description: "Échec de la mise à jour du défi.", variant: 'destructive' });
+            }
         });
     };
     
@@ -548,38 +616,53 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
 }
 
 const JeuxSuivi = ({ games, stageId }: { games: Game[], stageId: number }) => {
+    const [gameHistory, setGameHistory] = useState<StageGameHistory[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchGameHistory = useCallback(async () => {
+        setLoading(true);
+        const history = await getStageGameHistory(stageId);
+        setGameHistory(history);
+        setLoading(false);
+    }, [stageId]);
+
+    useEffect(() => {
+        fetchGameHistory();
+    }, [fetchGameHistory]);
     
     if (games.length === 0) return null;
     
     return (
         <div>
             <h3 className="text-xl font-semibold flex items-center gap-3 mb-4 text-purple-400">
-                <Gamepad2 className="w-6 h-6" />Jeux &amp; Quiz
+                <Gamepad2 className="w-6 h-6" />Jeux & Quiz
             </h3>
             <div className="space-y-3">
-                {games.map(game => {
-                    // In a real app, this would be reactive. Here we simulate reading from localStorage.
-                    const history = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(`game_history_${stageId}`) || '[]') : [];
-                    const gameResult = history.find((r: any) => r.gameId === game.id);
+                {loading ? (
+                    <div className="text-center py-4"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
+                ) : (
+                    games.map(game => {
+                        const gameResult = gameHistory.find(r => r.game_id === game.id);
 
-                    return (
-                        <Card key={game.id} className="hover:bg-muted/50 transition-colors group relative">
-                           <CardContent className="p-4 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{game.title}</p>
-                                    <p className="text-sm text-muted-foreground">Thème: {game.theme}</p>
-                                    {gameResult && (
-                                         <Badge variant={gameResult.percentage >= 75 ? 'default' : 'secondary'} className="mt-2">Score: {gameResult.percentage}%</Badge>
-                                    )}
-                                </div>
-                                <Link href={`/jeux/${game.id}`} className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}>
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Lancer
-                                </Link>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
+                        return (
+                            <Card key={game.id} className="hover:bg-muted/50 transition-colors group relative">
+                               <CardContent className="p-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold">{game.title}</p>
+                                        <p className="text-sm text-muted-foreground">Thème: {game.theme}</p>
+                                        {gameResult && (
+                                             <Badge variant={gameResult.percentage >= 75 ? 'default' : 'secondary'} className="mt-2">Score: {gameResult.percentage}%</Badge>
+                                        )}
+                                    </div>
+                                    <Link href={`/jeux/${game.id}`} className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}>
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Lancer
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        );
+                    })
+                )}
             </div>
         </div>
     )
@@ -609,13 +692,30 @@ const RessourcesView = ({ stageId, stageType, stageThemes }: { stageId: number, 
 const JeuxRessources = ({ stageId }: { stageId: number }) => {
     const [games, setGames] = useState<Game[]>([]);
     const [loading, setLoading] = useState(true);
-    
-    useEffect(() => {
-        getGamesForStage(stageId).then(data => {
-            setGames(data);
-            setLoading(false);
-        });
+    const [isDeleting, startDeleteTransition] = useTransition();
+    const { toast } = useToast();
+
+    const fetchGames = useCallback(async () => {
+        const data = await getGamesForStage(stageId);
+        setGames(data);
+        setLoading(false);
     }, [stageId]);
+
+    useEffect(() => {
+        fetchGames();
+    }, [fetchGames]);
+
+    const handleDeleteGame = (gameId: number) => {
+        startDeleteTransition(async () => {
+            const success = await deleteGame(gameId, stageId);
+            if (success) {
+                toast({ title: 'Jeu retiré', description: 'Le jeu a été retiré du stage.' });
+                await fetchGames();
+            } else {
+                toast({ title: 'Erreur', description: 'La suppression du jeu a échoué.', variant: 'destructive' });
+            }
+        });
+    };
 
     const newGameURL = `/jeux/generateur?stageId=${stageId}`;
 
@@ -633,7 +733,12 @@ const JeuxRessources = ({ stageId }: { stageId: number }) => {
                         <Card key={game.id} className="hover:bg-muted transition-colors group relative">
                             <CardContent className="p-4 flex justify-between items-center">
                                 <div><p className="font-semibold">{game.title}</p><p className="text-sm text-muted-foreground">Thème: {game.theme} - Créé le {format(new Date(game.created_at), 'd MMM yyyy', { locale: fr })}</p></div>
-                                <Link href={`/jeux/${game.id}`} className={cn(buttonVariants({variant: 'ghost'}))}><Play className="w-5 h-5"/></Link>
+                                <div className="flex items-center gap-2">
+                                    <Link href={`/jeux/${game.id}`} className={cn(buttonVariants({variant: 'ghost', size: 'icon'}))}><Play className="w-5 h-5"/></Link>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteGame(game.id)} disabled={isDeleting}>
+                                        {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5 text-destructive" />}
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
                     ))}</div>
@@ -648,15 +753,21 @@ const JeuxRessources = ({ stageId }: { stageId: number }) => {
 
 type CardContainer = Record<"available" | "selected", PedagogicalContent[]>;
 
-const ProgrammeBuilder = ({ 
-    stage, 
+const ProgrammeBuilder = ({
+    stage,
     sorties,
-    etagesData, 
+    etagesData,
+    stageId,
+    stageType,
+    stageThemes,
     onSave,
-}: { 
-    stage: Stage, 
+}: {
+    stage: Stage,
     sorties: Sortie[],
-    etagesData: EtagesData, 
+    etagesData: EtagesData,
+    stageId: number,
+    stageType: StageType,
+    stageThemes: string[],
     onSave: (newlySelectedCards: PedagogicalContent[]) => void,
 }) => {
     const { toast } = useToast();
@@ -786,7 +897,10 @@ const ProgrammeBuilder = ({
 
     const getPillarFromCardId = (cardId: number) => {
         const originalCard = allPedagogicalContent.find(q => q.id === cardId);
-        return originalCard?.dimension.toLowerCase();
+        return originalCard?.dimension
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
     };
     
     const handleTagFilterToggle = (tag: string) => {
@@ -892,34 +1006,19 @@ const ProgrammeBuilder = ({
                                 <div className="space-y-2">
                                      <div className="flex flex-col sm:flex-row flex-wrap gap-2 p-2 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mx-2 px-2 overflow-x-auto">
                                         <ToggleGroup type="single" value={pillarFilter ?? ""} onValueChange={(value) => setPillarFilter(value || null)} className="flex-shrink-0">
-                                            {Object.entries(PILLAR_STYLES).map(([key, { icon: PillarIcon }]) => {
+                                            {Object.entries(PILLAR_STYLES).map(([key, { icon: PillarIcon, badge }]) => {
                                                 const isActive = pillarFilter === key;
-                                                const textColor = key === 'comprendre' ? '#1e40af' :
-                                                                 key === 'observer' ? '#15803d' :
-                                                                 '#b45309';
-                                                const bgColor = key === 'comprendre' ? '#dbeafe' :
-                                                               key === 'observer' ? '#dcfce7' :
-                                                               '#fed7aa';
-                                                const borderColor = key === 'comprendre' ? '#93c5fd' :
-                                                                   key === 'observer' ? '#86efac' :
-                                                                   '#fdba74';
 
                                                 return (
                                                     <ToggleGroupItem
                                                         key={key}
                                                         value={key}
-                                                        className="border h-9 whitespace-nowrap"
-                                                        style={isActive ? {
-                                                            backgroundColor: bgColor,
-                                                            borderColor: borderColor,
-                                                            color: textColor
-                                                        } : {
-                                                            backgroundColor: 'var(--background)',
-                                                            borderColor: '#d1d5db',
-                                                            color: 'var(--foreground)'
-                                                        }}
+                                                        className={cn(
+                                                            "border h-9 whitespace-nowrap",
+                                                            isActive ? badge : "bg-background border-border text-foreground"
+                                                        )}
                                                     >
-                                                        <PillarIcon className="w-4 h-4 mr-2" style={isActive ? { color: textColor } : {}} />
+                                                        <PillarIcon className="w-4 h-4 mr-2" />
                                                         {key.charAt(0).toUpperCase() + key.slice(1)}
                                                     </ToggleGroupItem>
                                                 );
@@ -987,27 +1086,55 @@ const ProgrammeBuilder = ({
                 </CardContent>
             </Card>
         
-         <Card>
-            <CardHeader><CardTitle>Étape 4 : Action de l’encadrant (Finalisation)</CardTitle></CardHeader>
-            <CardContent className="flex flex-col sm:flex-row gap-4">
-                <Button asChild className="w-full" disabled={items.selected.length === 0}>
-                    <Link href={`/jeux/validation?stageId=${stage.id}&objectives=${items.selected.map(c => c.id).join(',')}`}>
-                        <GraduationCap className="mr-2 h-4 w-4" />Je teste mes connaissances
-                    </Link>
-                </Button>
-                <Button className="w-full" onClick={handleSaveProgram} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
-                    Appliquer le programme
-                </Button>
-            </CardContent>
-        </Card>
-      </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Étape 4 : Ressources pédagogiques</CardTitle>
+                    <CardDescription>Gérez les défis et jeux pour enrichir votre stage.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Tabs defaultValue="defis" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="defis"><Trophy className="w-4 h-4 mr-2"/>Défis</TabsTrigger>
+                            <TabsTrigger value="jeux"><Gamepad2 className="w-4 h-4 mr-2"/>Jeux</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="defis" className="mt-6">
+                            <DefisTab
+                                stageId={stageId}
+                                stageType={stageType}
+                                stageThemes={stageThemes}
+                            />
+                        </TabsContent>
+                        <TabsContent value="jeux" className="mt-6">
+                            <JeuxRessources stageId={stageId} />
+                        </TabsContent>
+                    </Tabs>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader><CardTitle>Étape 5 : Action de l’encadrant (Finalisation)</CardTitle></CardHeader>
+                <CardContent className="flex flex-col sm:flex-row gap-4">
+                    <Button asChild className="w-full" disabled={items.selected.length === 0}>
+                        <Link href={`/jeux/validation?stageId=${stage.id}&objectives=${items.selected.map(c => c.id).join(',')}`}>
+                            <GraduationCap className="mr-2 h-4 w-4" />Je teste mes connaissances
+                        </Link>
+                    </Button>
+                    <Button className="w-full" onClick={handleSaveProgram} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+                        Appliquer le programme
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
     );
 };
 
-
 const ActionableCard = ({ card, onAdd }: { card: PedagogicalContent, onAdd: () => void }) => {
-    const pillarKey = card.dimension.toLowerCase();
+    // Normaliser la dimension pour enlever les accents
+    const pillarKey = card.dimension
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
     const styleInfo = PILLAR_STYLES[pillarKey] || {};
 
     return (
@@ -1041,7 +1168,11 @@ const DraggableCard = ({ card, onRemove }: { card: PedagogicalContent, onRemove:
         opacity: isDragging ? 0.5 : 1,
         zIndex: isDragging ? 10 : 'auto',
     };
-    const pillarKey = card.dimension.toLowerCase();
+    // Normaliser la dimension pour enlever les accents
+    const pillarKey = card.dimension
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
     const styleInfo = PILLAR_STYLES[pillarKey] || {};
 
     return (
@@ -1210,127 +1341,22 @@ const SettingsView = ({ stage, onStageUpdate }: { stage: Stage, onStageUpdate: (
                                         <SelectItem value="Libre">Libre</SelectItem>
                                     </SelectContent>
                                     </Select>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="participants"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Participants</FormLabel>
-                                    <FormControl>
-                                    <Input type="number" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
                                 </FormItem>
                                 )}
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="start_date"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-col">
-                                        <FormLabel>Date de début</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                variant={'outline'}
-                                                className={cn(
-                                                    'w-full pl-3 text-left font-normal',
-                                                    !field.value && 'text-muted-foreground'
-                                                )}
-                                                >
-                                                {field.value ? (
-                                                    format(parse(field.value, 'yyyy-MM-dd', new Date()), 'PPP', { locale: fr })
-                                                ) : (
-                                                    <span>Choisissez une date</span>
-                                                )}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined}
-                                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
-                                                initialFocus
-                                                locale={fr}
-                                            />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="end_date"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-col">
-                                        <FormLabel>Date de fin</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                variant={'outline'}
-                                                className={cn(
-                                                    'w-full pl-3 text-left font-normal',
-                                                    !field.value && 'text-muted-foreground'
-                                                )}
-                                                disabled={type === 'Journée' || type === 'Hebdomadaire'}
-                                                >
-                                                {field.value ? (
-                                                    format(parse(field.value, 'yyyy-MM-dd', new Date()), 'PPP', { locale: fr })
-                                                ) : (
-                                                    <span>Choisissez une date</span>
-                                                )}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined}
-                                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
-                                                disabled={(date) => {
-                                                const startDateValue = form.getValues('start_date');
-                                                return startDateValue ? date < parse(startDateValue, 'yyyy-MM-dd', new Date()) : false;
-                                                }}
-                                                initialFocus
-                                                locale={fr}
-                                            />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                Annuler
+                            </Button>
+                            <Button type="submit">
+                                Enregistrer
+                            </Button>
                         </div>
-                        <DialogFooter className="pt-4 flex-col gap-2">
-                            <div className="w-full flex sm:flex-row flex-col-reverse gap-2">
-                                <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)} className="w-full">Annuler</Button>
-                                <Button type="submit" disabled={isUpdating} className="w-full">
-                                    {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Sauvegarder
-                                </Button>
-                            </div>
-                        </DialogFooter>
                     </form>
                 </Form>
-
-                <div className="border-t pt-6 mt-6">
-                    <DeleteSlider onConfirm={handleDelete} disabled={isDeleting} />
-                </div>
             </DialogContent>
         </Dialog>
     );
 };
-
-

@@ -414,6 +414,80 @@ export type Database = {
         }
         Relationships: []
       }
+      stage_objectives_completion: {
+        Row: {
+          id: number
+          stage_id: number
+          objective_id: string
+          completed_at: string
+        }
+        Insert: {
+          id?: number
+          stage_id: number
+          objective_id: string
+          completed_at?: string
+        }
+        Update: {
+          id?: number
+          stage_id?: number
+          objective_id?: string
+          completed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_objectives_completion_stage_id_fkey"
+            columns: ["stage_id"]
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      stage_game_history: {
+        Row: {
+          id: number
+          created_at: string
+          stage_id: number
+          game_id: number
+          score: number
+          total: number
+          percentage: number
+          results: Json
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          stage_id: number
+          game_id: number
+          score: number
+          total: number
+          percentage: number
+          results: Json
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          stage_id?: number
+          game_id?: number
+          score?: number
+          total?: number
+          percentage?: number
+          results?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_game_history_stage_id_fkey"
+            columns: ["stage_id"]
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_game_history_game_id_fkey"
+            columns: ["game_id"]
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       stages_exploits: {
         Row: {
           id: number
