@@ -499,10 +499,15 @@ const ObjectivesView = ({
 };
 
 const DefisSuivi = ({ stageId }: { stageId: number }) => {
+    console.log('[DefisSuivi] Component rendered for stageId:', stageId);
     const { toast } = useToast();
     const [isProcessing, startTransition] = useTransition();
 
     const [assignedDefis, setAssignedDefis] = useState<AssignedDefi[]>([]);
+    const [defiToProve, setDefiToProve] = useState<{assignedDefi: AssignedDefi, defi: Defi} | null>(null);
+
+    console.log('[DefisSuivi] assignedDefis:', assignedDefis);
+    console.log('[DefisSuivi] defiToProve:', defiToProve);
     
     const fetchDefis = useCallback(async () => {
         const dbExploits = await getStageExploits(stageId);
@@ -523,12 +528,16 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
     }, [fetchDefis]);
     
     const assignedDefisDetails = useMemo(() => {
-        return assignedDefis
+        console.log('[assignedDefisDetails] assignedDefis:', assignedDefis);
+        console.log('[assignedDefisDetails] allDefis:', allDefis);
+        const result = assignedDefis
             .map(am => {
                 const details = allDefis.find(m => m.id === am.defi_id);
                 return details ? { ...am, details } : null;
             })
             .filter((am): am is AssignedDefi & { details: Defi } => am !== null);
+        console.log('[assignedDefisDetails] result:', result);
+        return result;
     }, [assignedDefis]);
 
     const handleUpdateDefi = (assignedDefi: AssignedDefi, completed: boolean, preuveUrl?: string) => {
@@ -563,6 +572,7 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
             {assignedDefisDetails.map(assignedDefi => {
                 const defiDetails = assignedDefi.details;
                 if (!defiDetails) return null;
+                console.log('[DEFI RENDER]', defiDetails.description, 'type_preuve:', defiDetails.type_preuve);
                 const IconComponent = iconMap[defiDetails.icon] || Shield;
                 const isCompleted = assignedDefi.status === 'complete';
                 return (
@@ -598,7 +608,10 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
                                              {isCompleted && assignedDefi.preuve_url && (
                                                  <img src={assignedDefi.preuve_url} alt={`Preuve pour ${defiDetails.description}`} width={80} height={80} className="rounded-md object-cover mb-2" />
                                             )}
-                                            <Button size="sm" variant="outline">
+                                            <Button size="sm" variant="outline" onClick={() => {
+                                                console.log('[BUTTON CLICK] Setting defiToProve:', { assignedDefi, defi: defiDetails });
+                                                setDefiToProve({ assignedDefi, defi: defiDetails });
+                                            }} disabled={isProcessing}>
                                                 <Camera className="w-4 h-4 mr-2" />
                                                 {isCompleted ? 'Modifier la preuve' : 'Valider avec une photo'}
                                             </Button>
@@ -611,6 +624,11 @@ const DefisSuivi = ({ stageId }: { stageId: number }) => {
                 )
             })}
         </Accordion>
+        <CameraProofModal
+            defiToProve={defiToProve}
+            setDefiToProve={setDefiToProve}
+            onUpdateDefi={(assignedDefi, defi, completed, url) => handleUpdateDefi(assignedDefi, completed, url)}
+        />
       </div>
     )
 }
@@ -1356,6 +1374,184 @@ const SettingsView = ({ stage, onStageUpdate }: { stage: Stage, onStageUpdate: (
                         </div>
                     </form>
                 </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
+    defiToProve: { assignedDefi: AssignedDefi; defi: Defi } | null;
+    setDefiToProve: (data: { assignedDefi: AssignedDefi; defi: Defi } | null) => void;
+    onUpdateDefi: (assignedDefi: AssignedDefi, defi: Defi, completed: boolean, preuveUrl?: string) => void;
+}) => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+    const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+    const { toast } = useToast();
+
+    // Détecter si on est sur mobile ou desktop
+    useEffect(() => {
+        const checkIfMobile = () => {
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            setIsMobile(isMobileDevice || isTouchDevice);
+        };
+        checkIfMobile();
+    }, []);
+
+    useEffect(() => {
+        console.log('[CameraProofModal] defiToProve changed:', defiToProve);
+    }, [defiToProve]);
+
+    useEffect(() => {
+        const getCameraPermission = async () => {
+            // Sur mobile, on essaie d'accéder à la caméra
+            // Sur desktop, on skip cette étape (on utilisera l'upload de fichier)
+            if (defiToProve && !photoDataUrl && isMobile) {
+                setHasCameraPermission(null);
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    setHasCameraPermission(true);
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    setHasCameraPermission(false);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Accès Caméra Refusé',
+                        description: 'Veuillez autoriser l\'accès à la caméra dans les paramètres de votre navigateur.',
+                    });
+                }
+            }
+        };
+        getCameraPermission();
+
+        return () => {
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [defiToProve, photoDataUrl, isMobile, toast]);
+
+    const handleClose = () => {
+        setDefiToProve(null);
+        setPhotoDataUrl(null);
+    };
+
+    const takePicture = () => {
+        if (videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            setPhotoDataUrl(dataUrl);
+
+             if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+    };
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target?.result as string;
+                setPhotoDataUrl(dataUrl);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Fichier invalide',
+                description: 'Veuillez sélectionner une image (JPG, PNG, etc.).',
+            });
+        }
+    };
+
+    const handleValidate = () => {
+        if (defiToProve && photoDataUrl) {
+            onUpdateDefi(defiToProve.assignedDefi, defiToProve.defi, true, photoDataUrl);
+            handleClose();
+        }
+    }
+
+    return (
+        <Dialog open={!!defiToProve} onOpenChange={handleClose}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Preuve par Photo</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">{defiToProve?.defi.instruction}</p>
+                    <div className="bg-muted rounded-lg aspect-video flex items-center justify-center overflow-hidden">
+                        {photoDataUrl ? (
+                            <img src={photoDataUrl} alt="Aperçu de la preuve" className="object-contain w-full h-full" />
+                        ) : isMobile ? (
+                           <>
+                            <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted playsInline />
+                            <canvas ref={canvasRef} className="hidden" />
+                           </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center gap-4 p-8">
+                                <Camera className="w-16 h-16 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground text-center">
+                                    Cliquez sur le bouton ci-dessous pour sélectionner une image
+                                </p>
+                            </div>
+                        )}
+                        {isMobile && hasCameraPermission === false && (
+                             <Alert variant="destructive">
+                                <AlertTitle>Caméra requise</AlertTitle>
+                                <AlertDescription>Veuillez autoriser l'accès.</AlertDescription>
+                            </Alert>
+                        )}
+                         {isMobile && hasCameraPermission === null && (
+                            <div className="text-muted-foreground">Démarrage de la caméra...</div>
+                         )}
+                    </div>
+                     <div className="flex justify-center gap-4">
+                        {photoDataUrl ? (
+                            <>
+                                <Button variant="outline" onClick={() => setPhotoDataUrl(null)}>
+                                    <Camera className="mr-2 h-4 w-4" /> Reprendre
+                                </Button>
+                                <Button onClick={handleValidate}>
+                                    <Check className="mr-2 h-4 w-4" /> Valider le défi
+                                </Button>
+                            </>
+                        ) : isMobile ? (
+                            <Button onClick={takePicture} disabled={!hasCameraPermission}>
+                                <Camera className="mr-2 h-4 w-4" /> Prendre la photo
+                            </Button>
+                        ) : (
+                            <>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                />
+                                <Button onClick={() => fileInputRef.current?.click()}>
+                                    <Camera className="mr-2 h-4 w-4" /> Choisir une image
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     );

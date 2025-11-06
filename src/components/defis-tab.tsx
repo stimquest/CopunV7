@@ -332,14 +332,29 @@ const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
 }) => {
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
     const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
     const { toast } = useToast();
+
+    // Détecter si on est sur mobile ou desktop
+    useEffect(() => {
+        const checkIfMobile = () => {
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            setIsMobile(isMobileDevice || isTouchDevice);
+        };
+        checkIfMobile();
+    }, []);
 
     useEffect(() => {
         const getCameraPermission = async () => {
-            if (defiToProve && !photoDataUrl) {
-                setHasCameraPermission(null); 
+            // Sur mobile, on essaie d'accéder à la caméra
+            // Sur desktop, on skip cette étape (on utilisera l'upload de fichier)
+            if (defiToProve && !photoDataUrl && isMobile) {
+                setHasCameraPermission(null);
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     setHasCameraPermission(true);
@@ -365,7 +380,7 @@ const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
                 stream.getTracks().forEach(track => track.stop());
             }
         };
-    }, [defiToProve, photoDataUrl, toast]);
+    }, [defiToProve, photoDataUrl, isMobile, toast]);
     
     const handleClose = () => {
         setDefiToProve(null);
@@ -389,15 +404,31 @@ const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
             }
         }
     };
-    
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target?.result as string;
+                setPhotoDataUrl(dataUrl);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Fichier invalide',
+                description: 'Veuillez sélectionner une image (JPG, PNG, etc.).',
+            });
+        }
+    };
+
     const handleValidate = () => {
         if (defiToProve && photoDataUrl) {
             onUpdateDefi(defiToProve.assignedDefi, defiToProve.defi, true, photoDataUrl);
             handleClose();
         }
     }
-
-    if (!defiToProve) return null;
 
     return (
         <Dialog open={!!defiToProve} onOpenChange={handleClose}>
@@ -406,23 +437,30 @@ const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
                     <DialogTitle>Preuve par Photo</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">{defiToProve.defi.instruction}</p>
+                    <p className="text-sm text-muted-foreground">{defiToProve?.defi.instruction}</p>
                     <div className="bg-muted rounded-lg aspect-video flex items-center justify-center overflow-hidden">
                         {photoDataUrl ? (
-                            <img src={photoDataUrl} alt="Aperçu de la preuve" className="object-contain" />
-                        ) : (
+                            <img src={photoDataUrl} alt="Aperçu de la preuve" className="object-contain w-full h-full" />
+                        ) : isMobile ? (
                            <>
                             <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted playsInline />
                             <canvas ref={canvasRef} className="hidden" />
                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center gap-4 p-8">
+                                <Camera className="w-16 h-16 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground text-center">
+                                    Cliquez sur le bouton ci-dessous pour sélectionner une image
+                                </p>
+                            </div>
                         )}
-                        {hasCameraPermission === false && (
+                        {isMobile && hasCameraPermission === false && (
                              <Alert variant="destructive">
                                 <AlertTitle>Caméra requise</AlertTitle>
                                 <AlertDescription>Veuillez autoriser l'accès.</AlertDescription>
                             </Alert>
                         )}
-                         {hasCameraPermission === null && (
+                         {isMobile && hasCameraPermission === null && (
                             <div className="text-muted-foreground">Démarrage de la caméra...</div>
                          )}
                     </div>
@@ -436,10 +474,23 @@ const CameraProofModal = ({ defiToProve, setDefiToProve, onUpdateDefi }: {
                                     <Check className="mr-2 h-4 w-4" /> Valider le défi
                                 </Button>
                             </>
-                        ) : (
+                        ) : isMobile ? (
                             <Button onClick={takePicture} disabled={!hasCameraPermission}>
                                 <Camera className="mr-2 h-4 w-4" /> Prendre la photo
                             </Button>
+                        ) : (
+                            <>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                />
+                                <Button onClick={() => fileInputRef.current?.click()}>
+                                    <Camera className="mr-2 h-4 w-4" /> Choisir une image
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>
