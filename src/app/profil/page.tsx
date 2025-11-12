@@ -24,6 +24,7 @@ import { Progress } from '@/components/ui/progress';
 import { allExploits } from '@/data/exploits';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getQuizAttemptsForUser } from '@/app/actions';
+import { useAuth } from '@/lib/auth';
 import { groupedThemes } from '@/data/etages';
 import { allDefis } from '@/data/defis';
 import { Badge } from '@/components/ui/badge';
@@ -205,19 +206,22 @@ const CompetencesTab = () => {
     const [loading, setLoading] = useState(true);
     const [competencies, setCompetencies] = useState<Competency[]>([]);
     const [username, setUsername] = useState<string | null>(null);
+    const { user } = useAuth();
 
     useEffect(() => {
         const storedUsername = localStorage.getItem('econav_username');
         setUsername(storedUsername);
 
         const calculateCompetencies = async () => {
-            if (!storedUsername) {
+            // Prefer authenticated user id when available, fallback to stored username
+            const userId = user?.id || storedUsername;
+            if (!userId) {
                 setLoading(false);
                 return;
             }
 
             setLoading(true);
-            const attempts = await getQuizAttemptsForUser(storedUsername);
+            const attempts = await getQuizAttemptsForUser(userId);
             const allThemes = groupedThemes.flatMap(g => g.themes);
             
             const competencyData = allThemes.map(theme => {
@@ -239,7 +243,7 @@ const CompetencesTab = () => {
         }
         
         calculateCompetencies();
-    }, []);
+    }, [user]);
 
     if (loading) {
         return <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>

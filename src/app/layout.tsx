@@ -5,6 +5,7 @@ import './globals.css';
 import { AppLayout } from '@/components/app-layout';
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt';
 import { ConnectionStatus } from '@/components/connection-status';
+import { AuthProvider } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: "Cop'un de la mer",
@@ -56,9 +57,11 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-body antialiased">
-        <AppLayout>
+        <AuthProvider>
+          <AppLayout>
             {children}
-        </AppLayout>
+          </AppLayout>
+        </AuthProvider>
         <ConnectionStatus />
         <PWAInstallPrompt />
         <Toaster />

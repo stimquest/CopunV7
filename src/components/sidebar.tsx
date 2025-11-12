@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useMounted } from '@/hooks/use-mounted';
 import { useLocalStorage, useStringStorage } from '@/hooks/use-local-storage';
+import { useAuth } from '@/lib/auth';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,8 @@ export function Sidebar({ menuItems }: SidebarProps) {
 
     const { value: isExpanded, setValue: setIsExpanded } = useLocalStorage('sidebar-expanded', true);
     const { value: username } = useStringStorage('econav_username', 'Moniteur');
+    const { user, signOut } = useAuth();
+    const displayName = user?.user_metadata?.full_name || user?.email || username;
 
     const toggleSidebar = () => {
         setIsExpanded(!isExpanded);
@@ -50,7 +53,7 @@ export function Sidebar({ menuItems }: SidebarProps) {
 
     return (
         <aside className={cn(
-            "relative hidden h-screen bg-sidebar-background border-r-sidebar-border transition-all duration-300 ease-in-out md:flex flex-col sticky top-0",
+            "hidden h-screen bg-sidebar-background border-r-sidebar-border transition-all duration-300 ease-in-out md:flex flex-col sticky top-0 overflow-hidden",
             isExpanded ? "w-64" : "w-20"
         )}>
             <div className={cn("flex h-16 items-center border-b border-sidebar-border px-6", isExpanded ? 'justify-start' : 'justify-center')}>
@@ -70,16 +73,23 @@ export function Sidebar({ menuItems }: SidebarProps) {
             <div className="mt-auto p-4 border-t border-sidebar-border">
                 <div className={cn("flex items-center", isExpanded ? "justify-between" : "justify-center")}>
                      {isExpanded ? (
-                        <Link href="/profil" className="flex items-center gap-3 rounded-lg text-muted-foreground transition-all hover:text-primary">
-                            <Avatar className="h-8 w-8">
-                                <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm font-medium text-sidebar-foreground">{username}</span>
-                        </Link>
-                     ) : (
-                        // No avatar link when collapsed, the icon is in the main nav
-                        null
-                     )}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <Link href="/profil" className="flex items-center gap-3 rounded-lg text-muted-foreground transition-all hover:text-primary min-w-0">
+                                    <Avatar className="h-8 w-8">
+                                        <AvatarFallback>{String(displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm font-medium text-sidebar-foreground max-w-[120px] truncate block">{displayName}</span>
+                                </Link>
+                                {user ? (
+                                    <Button variant="ghost" size="sm" onClick={() => signOut()} className="ml-2 whitespace-nowrap flex-shrink-0">
+                                        Se déconnecter
+                                    </Button>
+                                ) : null}
+                            </div>
+                         ) : (
+                            // No avatar link when collapsed, the icon is in the main nav
+                            null
+                         )}
                     <TooltipProvider delayDuration={0}>
                         <Tooltip>
                             <TooltipTrigger asChild>

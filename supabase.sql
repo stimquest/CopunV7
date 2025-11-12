@@ -1,2 +1,0 @@
--- This file is deprecated and replaced by the migrations folder.
--- You can run the migrations using the Supabase CLI.

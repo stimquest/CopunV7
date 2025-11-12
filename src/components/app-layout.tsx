@@ -1,7 +1,9 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/sidebar';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { 
@@ -22,6 +24,23 @@ const menuItems = [
 
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    // If auth initialization finished and no user, restrict access to home and signin only
+    if (!authLoading && !user) {
+      const publicPaths = ['/', '/signin'];
+      // allow public assets and api
+      if (publicPaths.includes(pathname) || pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/assets') || pathname === '/favicon.ico') {
+        return;
+      }
+      // redirect unauthenticated users to home
+      router.replace('/');
+    }
+  }, [authLoading, user, pathname, router]);
+
   return (
     <div className="flex min-h-screen w-full bg-muted/40 safe-area-inset">
       <Sidebar menuItems={menuItems}/>
