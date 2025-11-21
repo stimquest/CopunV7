@@ -49,6 +49,9 @@ export async function createStage(stage: Omit<Stage, 'id' | 'created_at'>) {
         participants: stage.participants,
         start_date: stage.start_date,
         end_date: stage.end_date,
+        sport_activity: stage.sport_activity || null,
+        sport_level: stage.sport_level || null,
+        sport_description: stage.sport_description || null,
     }).select().single();
 
     if (error) {
@@ -66,6 +69,9 @@ export async function updateStage(stage: Omit<Stage, 'created_at'>): Promise<Sta
         participants: stage.participants,
         start_date: stage.start_date,
         end_date: stage.end_date,
+        sport_activity: stage.sport_activity || null,
+        sport_level: stage.sport_level || null,
+        sport_description: stage.sport_description || null,
     }).eq('id', stage.id).select().single();
 
     if (error) {

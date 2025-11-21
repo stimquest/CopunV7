@@ -9,22 +9,26 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { useStringStorage } from '@/hooks/use-local-storage';
+import { useAuth } from '@/lib/auth';
 import { ArrowRight } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
-  const { value: username, setValue: setUsername, isLoading } = useStringStorage('econav_username', 'Moniteur_Demo');
+  const { user, loading: authLoading, signOut } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username) {
-      setUsername(username);
-      router.push('/stages');
-    }
+  useEffect(() => {
+    setLoading(authLoading);
+  }, [authLoading]);
+
+  const handleSignOut = async () => {
+    setLoading(true);
+    await signOut();
+    setLoading(false);
+    router.push('/signin');
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-secondary p-4">
         <Card className="w-full max-w-2xl shadow-lg">
@@ -67,22 +71,25 @@ export default function HomePage() {
                 <p className="font-semibold text-foreground">COP’UN c’est un ami qui te veut du bien.</p>
                 <p className="font-bold text-lg text-primary">A toi de jouer !</p>
             </div>
-            <form onSubmit={handleLogin} className="space-y-6 mt-8">
-                <div className="space-y-2">
-                    <Label htmlFor="username">Nom d'utilisateur</Label>
-                    <Input
-                        id="username"
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                    />
-                </div>
-                <Button type="submit" size="lg" className="w-full text-base py-6">
-                    <ArrowRight className="mr-2 h-5 w-5" />
-                    Se connecter
-                </Button>
-            </form>
+            <div className="space-y-6 mt-8 text-center">
+              {user ? (
+                <>
+                  <h3 className="text-lg font-semibold">Connecté en tant que {user.user_metadata?.full_name || user.email}</h3>
+                  <div className="flex gap-4 justify-center">
+                    <Button onClick={() => router.push('/stages')} size="lg">Voir mes stages</Button>
+                    <Button variant="outline" onClick={handleSignOut} size="lg">Se déconnecter</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">Veuillez vous connecter pour accéder à vos stages et contenus.</p>
+                  <div className="flex gap-4 justify-center">
+                    <Button onClick={() => router.push('/signin')} size="lg">Se connecter</Button>
+                    <Button variant="outline" onClick={() => router.push('/profil')} size="lg">Profil (local)</Button>
+                  </div>
+                </>
+              )}
+            </div>
         </CardContent>
       </Card>
     </div>

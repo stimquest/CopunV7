@@ -51,6 +51,9 @@ const stageSchema = z.object({
   participants: z.coerce.number().int().positive({ message: 'Le nombre de participants doit être positif.' }),
   start_date: z.string().min(1, { message: 'Une date de début est requise.' }),
   end_date: z.string().min(1, { message: 'Une date de fin est requise.' }),
+  sport_activity: z.string().optional().nullable(),
+  sport_level: z.string().optional().nullable(),
+  sport_description: z.string().optional().nullable(),
 }).refine(data => {
     return data.end_date >= data.start_date;
 }, { message: 'La date de fin doit être après ou égale à la date de début.', path: ['end_date'] });
@@ -63,6 +66,9 @@ const defaultValues: StageFormValues = {
   participants: 8,
   start_date: format(new Date(), 'yyyy-MM-dd'),
   end_date: format(addDays(new Date(), 4), 'yyyy-MM-dd'),
+  sport_activity: null,
+  sport_level: null,
+  sport_description: null,
 };
 
 
@@ -249,6 +255,51 @@ export function CreateStageForm({ onStageCreate, isCreating }: { onStageCreate: 
                     )}
                 />
             </div>
+
+            {/* Sport Activity Section */}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-sm font-semibold">Structure Sportive (Optionnel)</h3>
+              <FormField
+                control={form.control}
+                name="sport_activity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Activité sportive</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Voile, Kayak, Paddle..." {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sport_level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Niveau sportif</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Débutant, Intermédiaire, Avancé..." {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sport_description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <textarea placeholder="Description de l'activité sportive..." className="w-full px-3 py-2 border rounded-md text-sm" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <DialogFooter>
               <Button type="submit" disabled={isCreating}>
                 {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

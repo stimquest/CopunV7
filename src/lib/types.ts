@@ -109,6 +109,9 @@ export interface Stage {
     participants: number;
     start_date: string; // YYYY-MM-DD
     end_date: string;   // YYYY-MM-DD
+    sport_activity?: string | null; // e.g., "Voile", "Kayak", "Paddle"
+    sport_level?: string | null; // e.g., "Débutant", "Intermédiaire", "Avancé"
+    sport_description?: string | null; // Description of the sport activity
 }
 
 export interface Sortie {
@@ -123,6 +126,69 @@ export interface Sortie {
     content: string;
     selected_notions: Partial<SelectedNotions>;
     selected_content: Partial<SelectedContent>;
+}
+
+// V8 Model - Sessions and Capsules
+export interface Session {
+    id: number;
+    stage_id: number;
+    title: string;
+    description?: string | null;
+    session_order: number;
+    objectives?: string[] | null;
+    success_criteria?: string[] | null;
+    required_materials?: string[] | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SessionStructure {
+    id: number;
+    session_id: number;
+    step_order: number;
+    step_title: string;
+    step_duration_minutes?: number | null;
+    step_description?: string | null;
+    created_at: string;
+}
+
+export interface EnvironmentModule {
+    id: number;
+    title: string;
+    description?: string | null;
+    duration_minutes?: number | null;
+    level?: string | null; // 'débutant', 'intermédiaire', 'avancé'
+    created_by: string;
+    is_public: boolean;
+    activity_types: string[];
+    location_types: string[];
+    themes: string[];
+    season: string[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ModuleContent {
+    id: number;
+    module_id: number;
+    content_type: 'info' | 'question' | 'game' | 'defi' | 'tip';
+    content_data: Record<string, any>;
+    content_order: number;
+    created_at: string;
+}
+
+export interface EnvironmentModuleWithContent extends EnvironmentModule {
+    content: ModuleContent[];
+}
+
+export interface SessionModule {
+    id: number;
+    session_id: number;
+    module_id: number;
+    session_step_id?: number | null;
+    module_order: number;
+    custom_modifications?: Record<string, any> | null;
+    created_at: string;
 }
 
 export type ObservationCategory = "Faune" | "Flore" | "Pollution" | "Phénomène inhabituel";
@@ -306,3 +372,48 @@ export interface DefiProgress {
     completed: number;
     total: number;
 }
+
+// ============================================================================
+// NEW TYPES FOR V8: SESSIONS AND ENVIRONMENT CAPSULES
+// ============================================================================
+
+// Session types
+export interface Session {
+    id: number;
+    stage_id: number;
+    title: string;
+    description: string | null;
+    session_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SessionStructure {
+    id: number;
+    session_id: number;
+    step_order: number;
+    step_title: string;
+    step_duration_minutes: number | null;
+    step_description: string | null;
+    created_at: string;
+}
+
+// Filter types for module discovery
+export interface ModuleFilters {
+    activity_types?: string[];
+    location_types?: string[];
+    themes?: string[];
+    season?: string[];
+    level?: string;
+    duration_min?: number;
+    duration_max?: number;
+    search?: string;
+}
+
+// Backward compatibility aliases
+export type EnvironmentCapsule = EnvironmentModule;
+export type CapsuleContent = ModuleContent;
+export type EnvironmentCapsuleWithContent = EnvironmentModuleWithContent;
+export type SessionCapsule = SessionModule;
+export type CapsuleFilters = ModuleFilters;
+export type CapsuleContentType = 'info' | 'question' | 'game' | 'defi' | 'tip';

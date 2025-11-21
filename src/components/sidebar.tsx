@@ -12,7 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMounted } from '@/hooks/use-mounted';
-import { useLocalStorage, useStringStorage } from '@/hooks/use-local-storage';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { UserMenu } from '@/components/user-menu';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,6 @@ export function Sidebar({ menuItems }: SidebarProps) {
     const isMounted = useMounted();
 
     const { value: isExpanded, setValue: setIsExpanded } = useLocalStorage('sidebar-expanded', true);
-    const { value: username } = useStringStorage('econav_username', 'Moniteur');
 
     const toggleSidebar = () => {
         setIsExpanded(!isExpanded);
@@ -50,7 +50,7 @@ export function Sidebar({ menuItems }: SidebarProps) {
 
     return (
         <aside className={cn(
-            "relative hidden h-screen bg-sidebar-background border-r-sidebar-border transition-all duration-300 ease-in-out md:flex flex-col sticky top-0",
+            "hidden h-screen bg-sidebar-background border-r-sidebar-border transition-all duration-300 ease-in-out md:flex flex-col sticky top-0",
             isExpanded ? "w-64" : "w-20"
         )}>
             <div className={cn("flex h-16 items-center border-b border-sidebar-border px-6", isExpanded ? 'justify-start' : 'justify-center')}>
@@ -67,19 +67,15 @@ export function Sidebar({ menuItems }: SidebarProps) {
                 </TooltipProvider>
             </nav>
 
-            <div className="mt-auto p-4 border-t border-sidebar-border">
-                <div className={cn("flex items-center", isExpanded ? "justify-between" : "justify-center")}>
-                     {isExpanded ? (
-                        <Link href="/profil" className="flex items-center gap-3 rounded-lg text-muted-foreground transition-all hover:text-primary">
-                            <Avatar className="h-8 w-8">
-                                <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm font-medium text-sidebar-foreground">{username}</span>
-                        </Link>
-                     ) : (
-                        // No avatar link when collapsed, the icon is in the main nav
-                        null
-                     )}
+            <div className="mt-auto border-t border-sidebar-border">
+                <div className={cn("flex items-center justify-between", isExpanded ? "p-2" : "p-1")}>
+                    {isExpanded ? (
+                        <UserMenu />
+                    ) : (
+                        <div className="flex justify-center w-full py-2">
+                            <UserMenu />
+                        </div>
+                    )}
                     <TooltipProvider delayDuration={0}>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -87,15 +83,17 @@ export function Sidebar({ menuItems }: SidebarProps) {
                                     onClick={toggleSidebar}
                                     variant="ghost"
                                     size="icon"
-                                    className="text-sidebar-foreground hover:bg-sidebar-accent"
+                                    className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
                                 >
-                                    <ChevronLeft className={cn("h-5 w-5 transition-transform", !isExpanded && "rotate-180")} />
+                                    <ChevronLeft className={cn("h-4 w-4 transition-transform", !isExpanded && "rotate-180")} />
                                 </Button>
                             </TooltipTrigger>
-                            {!isExpanded && <TooltipContent side="right">{isExpanded ? "Réduire" : "Agrandir"}</TooltipContent>}
+                            <TooltipContent side="right">
+                                {isExpanded ? "Réduire" : "Agrandir"}
+                            </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
-                 </div>
+                </div>
             </div>
         </aside>
     );
@@ -114,7 +112,9 @@ function SidebarNavLinks({ title, links, isExpanded, pathname }: SidebarNavLinks
             {isExpanded && (
                 <h3 className="px-3 py-2 text-xs font-semibold uppercase text-sidebar-foreground/60 tracking-wider">{title}</h3>
             )}
-             {links.map(link => {
+             {links
+                .filter(link => link.href !== "/modules")
+                .map(link => {
                 const Icon = link.icon;
                 const isActive = pathname.startsWith(link.href);
                 return (

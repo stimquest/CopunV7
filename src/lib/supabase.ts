@@ -1,17 +1,14 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from './database.types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Configuration optimisée pour les performances
-export const supabase = createClient<Database>(
-  supabaseUrl as string,
-  supabaseAnonKey as string,
+export const supabase = createBrowserClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
   {
-    db: {
-      schema: 'public',
-    },
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -31,4 +28,3 @@ export const supabase = createClient<Database>(
   }
 )
 
-    

@@ -2,9 +2,11 @@
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
-import { AppLayout } from '@/components/app-layout';
+
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt';
 import { ConnectionStatus } from '@/components/connection-status';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
   title: "Cop'un de la mer",
@@ -56,12 +58,12 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-body antialiased">
-        <AppLayout>
-            {children}
-        </AppLayout>
-        <ConnectionStatus />
-        <PWAInstallPrompt />
-        <Toaster />
+        <AuthProvider>
+          {children}
+          <ConnectionStatus />
+          <PWAInstallPrompt />
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );
