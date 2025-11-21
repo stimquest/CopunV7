@@ -6,6 +6,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getGameById, getFilteredGameCards, saveQuizAttempt, getPedagogicalContent, saveStageGameResult } from '@/app/actions';
+import { useAuth } from '@/lib/auth';
 import type { Game, GameCard, TriageCard, MotsEnRafaleCard, DilemmeDuMarinCard, QuizzCard, GameCardType, ContentCard, QuizAttempt, PedagogicalContent } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -133,10 +134,13 @@ function GameDisplayPage() {
         
         // Save quiz attempt for the instructor
         if (gameMode === 'validation') {
-            const username = localStorage.getItem('econav_username');
-            if (username && game) {
+            // Prefer server auth user id when available, fallback to localStorage username
+            const auth = (window as any).__econav_auth_user || null;
+            const usernameFallback = localStorage.getItem('econav_username');
+            const userIdToSave = auth?.id || usernameFallback || 'anonymous';
+            if (userIdToSave && game) {
                 const attempt: Omit<QuizAttempt, 'id' | 'attempted_at'> = {
-                    user_id: username,
+                    user_id: userIdToSave,
                     theme: game.theme,
                     score: percentage,
                     total_questions: allGameCards.length
