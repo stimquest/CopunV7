@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SessionStructureWithCapsules } from './session-structure-with-capsules';
+import { SessionStructureManager } from './session-structure-manager';
 import { SessionDetailsEditor } from './session-details-editor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -12,7 +12,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTransition } from 'react';
-import { updateSession } from '@/app/actions-capsules';
+import { updateSession } from '@/app/actions-sessions';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -73,7 +73,7 @@ export function SessionEditor({ session, stageId, onSave }: SessionEditorProps) 
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="infos">Infos</TabsTrigger>
           <TabsTrigger value="objectifs">Objectifs</TabsTrigger>
-          <TabsTrigger value="etapes">Étapes & Capsules</TabsTrigger>
+          <TabsTrigger value="etapes">Étapes</TabsTrigger>
           <TabsTrigger value="details">Détails</TabsTrigger>
         </TabsList>
 
@@ -132,13 +132,13 @@ export function SessionEditor({ session, stageId, onSave }: SessionEditorProps) 
         <TabsContent value="etapes">
           <Card>
             <CardHeader>
-              <CardTitle>Étapes & Modules Environnement</CardTitle>
+              <CardTitle>Étapes de la séance</CardTitle>
               <CardDescription>
-                Construisez votre séance en ajoutant des étapes sportives et en assignant des modules environnement à chaque étape
+                Construisez votre séance en ajoutant des étapes sportives
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SessionStructureWithCapsules sessionId={session.id} />
+              <SessionStructureManager sessionId={session.id} />
             </CardContent>
           </Card>
         </TabsContent>

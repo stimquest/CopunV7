@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getSessions, getSessionStructure, getSessionCapsules } from '@/app/actions-capsules';
-import type { Session, SessionStructure, SessionCapsule, EnvironmentCapsule } from '@/lib/types';
+import { getSessions, getSessionStructure } from '@/app/actions-sessions';
+import type { Session, SessionStructure } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTransition } from 'react';
-import { createSession, deleteSession, updateSession } from '@/app/actions-capsules';
+import { createSession, deleteSession, updateSession } from '@/app/actions-sessions';
 import { SessionEditor } from './session-editor';
 
 const sessionSchema = z.object({
@@ -33,7 +33,6 @@ interface SessionsHierarchyViewProps {
 
 interface SessionWithDetails extends Session {
   steps?: SessionStructure[];
-  capsules?: (SessionCapsule & { capsule?: EnvironmentCapsule })[];
 }
 
 export function SessionsHierarchyView({ stageId }: SessionsHierarchyViewProps) {
@@ -63,16 +62,15 @@ export function SessionsHierarchyView({ stageId }: SessionsHierarchyViewProps) {
     setLoading(true);
     try {
       const sessionsData = await getSessions(stageId);
-      
+
       // Load details for each session
       const sessionsWithDetails = await Promise.all(
         sessionsData.map(async (session) => {
           const steps = await getSessionStructure(session.id);
-          const capsules = await getSessionCapsules(session.id);
-          return { ...session, steps, capsules };
+          return { ...session, steps };
         })
       );
-      
+
       setSessions(sessionsWithDetails);
     } catch (error) {
       console.error('Error loading sessions:', error);

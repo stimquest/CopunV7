@@ -398,3 +398,56 @@ export async function deleteSessionWithSteps(
   revalidatePath(`/stages/${stageId}/programme`);
   return true;
 }
+
+/* ============================================================================
+ * BASIC CRUD (Added for compatibility)
+ * ==========================================================================*/
+
+export async function createSession(
+  stageId: number,
+  data: { title: string; description?: string | null; session_order: number }
+): Promise<Session | null> {
+  const client = supabase as any;
+  const { data: session, error } = await client
+    .from('sessions')
+    .insert({
+      stage_id: stageId,
+      title: data.title,
+      description: data.description,
+      session_order: data.session_order,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('[createSession] error', error);
+    return null;
+  }
+
+  revalidatePath(`/stages/${stageId}`);
+  return session as Session;
+}
+
+export async function updateSession(
+  sessionId: number,
+  data: Partial<Pick<Session, 'title' | 'description' | 'objectives' | 'success_criteria' | 'required_materials'>>
+): Promise<boolean> {
+  const client = supabase as any;
+  const { error } = await client
+    .from('sessions')
+    .update(data)
+    .eq('id', sessionId);
+
+  if (error) {
+    console.error('[updateSession] error', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteSession(sessionId: number, stageId: number): Promise<boolean> {
+  return deleteSessionWithSteps(stageId, sessionId);
+}
+
+// Alias for compatibility
+export const getSessions = getSessionsForStage;
