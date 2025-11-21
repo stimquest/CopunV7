@@ -3,8 +3,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { Loader2, Calendar, Users, ChevronDown, CheckCircle2, BookOpen, Eye, Shield, Trophy, ArrowRight, Gamepad2, Anchor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -122,13 +120,8 @@ const StageCard = ({ stage }: { stage: StageWithProgress }) => {
                              </AccordionTrigger>
                              <AccordionContent className="pt-4 space-y-2">
                                 {Object.keys(stage.objectivesProgress).length > 0 ? (
-<<<<<<<< HEAD:src/app/(app)/stages/page.tsx
                                     Object.entries(stage.objectivesProgress).map(([themeTitle, p]) => {
                                          const theme = stage.mainThemes?.find(t => t.title === themeTitle);
-========
-                             Object.entries(stage.objectivesProgress).map(([themeTitle, p]) => {
-                                 const theme = (stage.mainThemes || []).find(t => t.title === themeTitle);
->>>>>>>> f982b32dfd8735326b0e114941d10d67d577fe23:src/app/stages/page.tsx
                                          if (!theme) return null;
                                          const ThemeIcon = theme.icon;
                                          const percentage = p.total > 0 ? (p.completed / p.total) * 100 : 0;
@@ -210,16 +203,6 @@ const StageCard = ({ stage }: { stage: StageWithProgress }) => {
 
 
 export default function StageManagerPage() {
-    const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
-
-    useEffect(() => {
-        // if auth loading is finished and no user, redirect to signin
-        if (!authLoading && !user) {
-            router.push('/signin');
-        }
-    }, [user, authLoading, router]);
-
     const [stagesWithProgress, setStagesWithProgress] = useState<StageWithProgress[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, startCreateTransition] = useTransition();
@@ -278,7 +261,7 @@ export default function StageManagerPage() {
                     const allThemeIdsInProgram = new Set<string>();
 
                     programObjectiveIds.forEach(objId => {
-                        const content = (localPedagogicalContent || []).find(c => c.id.toString() === objId);
+                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
                         if(content) {
                             content.tags_theme.forEach(themeId => allThemeIdsInProgram.add(themeId));
                         }
@@ -293,7 +276,7 @@ export default function StageManagerPage() {
                     });
 
                     programObjectiveIds.forEach(objId => {
-                        const content = (localPedagogicalContent || []).find(c => c.id.toString() === objId);
+                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
                         if(content) {
                             mainThemes.forEach(theme => {
                                 if (content.tags_theme.includes(theme.id)) {
@@ -331,7 +314,7 @@ export default function StageManagerPage() {
                         if (entry.results && Array.isArray(entry.results)) {
                             (entry.results as any[]).forEach((result: any) => {
                                 // Essayer de trouver le thème depuis la carte
-                                const card = (localGameCards || []).find(c => c.id === result.cardId);
+                                const card = localGameCards.find(c => c.id === result.cardId);
                                 const theme = card?.theme || result.theme || 'Inconnu';
 
                                 if (!themeScores[theme]) {

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import {
-    Anchor,
     BookOpen,
     Shield,
     Eye,
@@ -26,8 +25,12 @@ export default function MarketingPage() {
             <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
                     <div className="flex items-center gap-2">
-                        <Anchor className="h-6 w-6 text-blue-600" />
-                        <span className="text-xl font-bold text-slate-900">Cop'un de la Mer</span>
+                        <img
+                            src="/assets/logoBaleine.png"
+                            alt="Logo Cop'un avec la Mer"
+                            className="h-8 w-auto"
+                        />
+                        <span className="text-xl font-bold text-blue-800">Cop'un avec la Mer</span>
                     </div>
                     <div className="hidden md:flex items-center gap-6">
                         <Link href="#features" className="text-sm font-medium text-slate-600 hover:text-blue-600">
@@ -83,7 +86,7 @@ export default function MarketingPage() {
                                 </Link>
                             </div>
                         </div>
-                        <div className="relative mx-auto w-full max-w-[600px] lg:max-w-none flex justify-center items-center lg:justify-end">
+                        <div className="relative mx-auto w-full max-w-[800px] lg:max-w-none flex justify-center items-center lg:justify-end">
                             <img
                                 src="/assets/COPUNMER01.png"
                                 alt="Interface Cop'un de la Mer"
@@ -353,8 +356,12 @@ export default function MarketingPage() {
                     <div className="grid gap-8 md:grid-cols-4">
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
-                                <Anchor className="h-6 w-6 text-blue-600" />
-                                <span className="text-xl font-bold text-slate-900">Cop'un de la Mer</span>
+                                <img
+                                    src="/assets/logoBaleine.png"
+                                    alt="Logo Cop'un de la Mer"
+                                    className="h-6 w-6 text-blue-600"
+                                />
+                                <span className="text-xl font-bold text-slate-900">Cop'un avec la Mer</span>
                             </div>
                             <p className="text-sm">
                                 L'application de référence pour l'enseignement nautique durable.
