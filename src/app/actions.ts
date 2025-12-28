@@ -292,7 +292,7 @@ export async function saveOrUpdateProgramForStage(
 
     if (selectedCardIds.length === 0) {
         revalidatePath(`/stages/${stageId}`);
-        revalidatePath(`/stages/${stageId}/programme`);
+        // Note: /stages/${stageId}/programme n'est pas une route - supprimé
         return { success: true };
     }
 
@@ -348,7 +348,7 @@ export async function saveOrUpdateProgramForStage(
     // --- End of title update ---
 
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath(`/stages/${stageId}/programme`);
+    // Note: /stages/${stageId}/programme n'est pas une route - supprimé
     return { success: true };
 }
 
@@ -586,9 +586,16 @@ export async function deleteObservation(id: number) {
 
 // --- GAME CARDS ---
 
+// Flag pour éviter de seeder plusieurs fois par session serveur
+// NOTE: Ce flag est réinitialisé à chaque redémarrage du serveur, mais évite
+// les appels répétés pendant la même session (économise ~7 requêtes par appel)
+let gameCardsSeeded = false;
+
 // Function to seed initial game cards if they don't exist
-// This is a simplified approach for demonstration. In a real app, you might use migrations.
+// Optimisé: ne s'exécute qu'une fois par session serveur
 async function seedInitialGameCards() {
+    if (gameCardsSeeded) return; // Skip si déjà seedé cette session
+
     const tideQuizzCards: Omit<DbGameCard, 'id' | 'created_at'>[] = [
         {
             type: 'quizz',
@@ -682,6 +689,9 @@ async function seedInitialGameCards() {
             }
         }
     }
+
+    // Marquer comme seedé pour cette session
+    gameCardsSeeded = true;
 }
 
 

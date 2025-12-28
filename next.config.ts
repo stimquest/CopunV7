@@ -199,9 +199,42 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Experimental features
+  // Experimental features for performance
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', '@supabase/supabase-js', 'date-fns'],
+  },
+
+  // Headers de cache pour les assets statiques
+  async headers() {
+    return [
+      {
+        source: '/assets/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/:path*.png',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/:path*.ico',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
   },
 
   // Netlify specific configuration
