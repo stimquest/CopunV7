@@ -14,6 +14,9 @@ import type {
 
 export const runtime = 'nodejs';
 
+// Force cette route à être dynamique - évite l'exécution pendant le build
+export const dynamic = 'force-dynamic';
+
 /**
  * Version simplifiée & robuste:
  * - PAS de pdfkit (trop de frictions avec bundling / fonts).
