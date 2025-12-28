@@ -163,3 +163,141 @@ export interface ModuleFilters {
   duration_max?: number;
   search?: string;
 }
+
+export type StageType = string;
+
+export type DefiStatus = 'complete' | 'en_cours';
+
+export interface Defi {
+  id: string;
+  description: string;
+  instruction: string;
+  stage_type: string[];
+  type_preuve: 'photo' | 'checkbox' | 'action' | 'quiz';
+  icon: string;
+  tags_theme: string[];
+}
+
+export interface AssignedDefi {
+  id: number;
+  stage_id: number;
+  defi_id: string;
+  status: DefiStatus;
+  completed_at: string | null;
+  preuve_url: string | null;
+}
+
+export interface GameData {
+  [key: string]: any;
+}
+
+export interface Game {
+  id: number;
+  title: string;
+  theme: string;
+  created_at: string;
+  stage_id: number | null;
+  game_data: GameData;
+}
+
+export interface StageGameHistory {
+  id: number;
+  stage_id: number;
+  game_id: number;
+  score: number;
+  total: number;
+  percentage: number;
+  results: any;
+  created_at: string;
+}
+
+export type GameCardType = 'triage' | 'mots' | 'dilemme' | 'quizz';
+
+export interface TriageCard {
+  type: 'triage';
+  statement: string;
+  isTrue: boolean;
+}
+
+export interface MotsEnRafaleCard {
+  type: 'mots';
+  definition: string;
+  answer: string;
+}
+
+export interface DilemmeDuMarinCard {
+  type: 'dilemme';
+  optionA: string;
+  optionB: string;
+  explanation: string;
+}
+
+export interface QuizzCard {
+  type: 'quizz';
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation?: string;
+}
+
+export type GameCard = TriageCard | MotsEnRafaleCard | DilemmeDuMarinCard | QuizzCard;
+
+export type DbGameCardData = GameCard;
+
+export interface DbGameCard {
+  id: number;
+  created_at: string;
+  type: GameCardType;
+  data: any;
+}
+
+export interface QuizAttempt {
+  id: number;
+  attempted_at: string;
+  user_id: string;
+  theme: string;
+  score: number;
+  total_questions: number;
+}
+
+export interface Observation {
+  id: number;
+  created_at: string;
+  title: string;
+  description: string;
+  category: "Faune" | "Flore" | "Pollution" | "Phénomène inhabituel";
+  observation_date: string;
+  latitude: number;
+  longitude: number;
+}
+
+// Aliases for compatibility if needed
+export type TriageItem = TriageCard;
+export type MotsEnRafaleItem = MotsEnRafaleCard;
+export type DilemmeDuMarinItem = DilemmeDuMarinCard;
+export type QuizzItem = QuizzCard;
+
+export interface ProgramAxe {
+  id: string;
+  label: string;
+  // Add other properties if known
+}
+
+export interface ProgramSelections {
+  [key: string]: any;
+}
+
+export interface GameProgress {
+  averageScore: number;
+  themeScores: Record<string, ThemeScore>;
+}
+
+export interface ThemeScore {
+  correct: number;
+  total: number;
+}
+
+export interface DefiProgress {
+  completed: number;
+  total: number;
+}

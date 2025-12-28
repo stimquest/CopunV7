@@ -14,69 +14,6 @@ import { revalidatePath } from 'next/cache';
  *
  * Objectif:
  * - Rebrancher le constructeur de séances sur ces tables
- * - Sans toucher au reste du schéma ni recréer de tables.
- *
- * NOTE TYPE:
- * - Ton Database typé n'inclut pas encore "sessions" / "session_structure",
- *   donc TypeScript se plaint sur supabase.from(...).
- * - On force uncast (as any) sur supabase pour utiliser les bonnes tables
- *   réelles sans casser le build.
- */
-
-/* ============================================================================
- * SESSIONS
- * ==========================================================================*/
-
-export async function getSessionsForStage(stageId: number): Promise<Session[]> {
-  const client = supabase as any;
-
-  const { data, error } = await client
-    .from('sessions')
-    .select('*')
-    .eq('stage_id', stageId)
-    .order('session_order', { ascending: true })
-    .order('id', { ascending: true });
-
-  if (error) {
-    console.error('[getSessionsForStage] error', error);
-    return [];
-  }
-
-  return (data || []) as Session[];
-}
-
-/* ============================================================================
- * SESSION STRUCTURE
- * ==========================================================================*/
-
-export async function getSessionStructure(
-  sessionId: number
-): Promise<SessionStructure[]> {
-  const client = supabase as any;
-
-  const { data, error } = await client
-    .from('session_structure')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('step_order', { ascending: true })
-    .order('id', { ascending: true });
-
-  if (error) {
-    console.error('[getSessionStructure] error', error);
-    return [];
-  }
-
-  return (data || []) as SessionStructure[];
-}
-
-/* ============================================================================
- * TEMPLATES → SESSIONS
- * ==========================================================================*/
-
-/**
- * Crée une séance complète (sessions + session_structure) à partir d'un template.
- * Utilisé par le constructeur pour:
- *   "Séance 2h" → 1 row sessions + N rows session_structure.
  */
 export async function createSessionFromTemplate(
   stageId: number,
@@ -447,6 +384,44 @@ export async function updateSession(
 
 export async function deleteSession(sessionId: number, stageId: number): Promise<boolean> {
   return deleteSessionWithSteps(stageId, sessionId);
+}
+
+/**
+ * Récupère toutes les séances pour un stage donné.
+ */
+export async function getSessionsForStage(stageId: number): Promise<Session[]> {
+  const client = supabase as any;
+  const { data, error } = await client
+    .from('sessions')
+    .select('*')
+    .eq('stage_id', stageId)
+    .order('session_order', { ascending: true });
+
+  if (error) {
+    console.error('[getSessionsForStage] error', error);
+    return [];
+  }
+
+  return (data || []) as Session[];
+}
+
+/**
+ * Récupère la structure (étapes) d'une séance donnée.
+ */
+export async function getSessionStructure(sessionId: number): Promise<SessionStructure[]> {
+  const client = supabase as any;
+  const { data, error } = await client
+    .from('session_structure')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('step_order', { ascending: true });
+
+  if (error) {
+    console.error('[getSessionStructure] error', error);
+    return [];
+  }
+
+  return (data || []) as SessionStructure[];
 }
 
 // Alias for compatibility

@@ -11,33 +11,53 @@ import { format, parseISO, isSameDay, startOfDay, eachDayOfInterval } from 'date
 import { fr } from 'date-fns/locale';
 import { contextData, groupedThemes } from '@/data/etages';
 
+export async function getStagePageData(stageId: number) {
+    const [stage, sorties, games, etagesData, allPedagogicalContent, completedObjectivesIds] = await Promise.all([
+        getStageById(stageId),
+        getSortiesForStage(stageId),
+        getGamesForStage(stageId),
+        getEtagesData(),
+        getPedagogicalContent(),
+        getCompletedObjectives(stageId),
+    ]);
+
+    return {
+        stage,
+        sorties,
+        games,
+        etagesData,
+        allPedagogicalContent,
+        completedObjectivesIds,
+    };
+}
+
 // STAGES
 export async function getStages(): Promise<Stage[]> {
-  // Note: This is a server action, but we'll try to use offline cache if available
-  try {
-    const { data, error } = await supabase.from('stages').select('*').order('start_date', { ascending: true });
-    if (error) {
-      console.error('Error fetching stages:', error);
-      return [];
+    // Note: This is a server action, but we'll try to use offline cache if available
+    try {
+        const { data, error } = await supabase.from('stages').select('*').order('start_date', { ascending: true });
+        if (error) {
+            console.error('Error fetching stages:', error);
+            return [];
+        }
+        return data;
+    } catch (error) {
+        console.error('Error fetching stages:', error);
+        return [];
     }
-    return data;
-  } catch (error) {
-    console.error('Error fetching stages:', error);
-    return [];
-  }
 }
 
 export async function getStageById(id: number): Promise<Stage | null> {
     try {
-      const { data, error } = await supabase.from('stages').select('*').eq('id', id).single();
-      if (error) {
-          console.error('Error fetching stage:', error);
-          return null;
-      }
-      return data;
+        const { data, error } = await supabase.from('stages').select('*').eq('id', id).single();
+        if (error) {
+            console.error('Error fetching stage:', error);
+            return null;
+        }
+        return data;
     } catch (error) {
-      console.error('Error fetching stage:', error);
-      return null;
+        console.error('Error fetching stage:', error);
+        return null;
     }
 }
 
@@ -90,7 +110,7 @@ export async function deleteStage(stageId: number) {
         console.error('Error deleting associated sorties:', sortiesError);
         return false;
     }
-    
+
     // Then, delete the stage itself
     const { error: stageError } = await supabase.from('stages').delete().eq('id', stageId);
     if (stageError) {
@@ -105,53 +125,46 @@ export async function deleteStage(stageId: number) {
 // SORTIES
 export async function getSortiesForStage(stageId: number): Promise<Sortie[]> {
     try {
-      const { data, error } = await supabase.from('sorties').select('*').eq('stage_id', stageId).order('date', { ascending: false });
-      if (error) {
-          console.error('Error fetching sorties:', error);
-          return [];
-      }
-      return data.map(s => ({
-          ...s,
-          selected_notions: (s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
-          selected_content: (s.selected_content || {}) as Partial<SelectedContent>,
-      }));
+        const { data, error } = await supabase.from('sorties').select('*').eq('stage_id', stageId).order('date', { ascending: false });
+        if (error) {
+            console.error('Error fetching sorties:', error);
+            return [];
+        }
+        return data.map(s => ({
+            ...s,
+            selected_notions: (s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
+            selected_content: (s.selected_content || {}) as Partial<SelectedContent>,
+        }));
     } catch (error) {
-      console.error('Error fetching sorties:', error);
-      return [];
+        console.error('Error fetching sorties:', error);
+        return [];
     }
 }
 
-// Nouvelle fonction pour charger toutes les sorties en une seule requête
-export async function getAllSorties(): Promise<Map<number, Sortie[]>> {
-    const start = performance.now();
-    try {
-      const { data, error } = await supabase.from('sorties').select('*').order('date', { ascending: false });
-      const duration = performance.now() - start;
+export async function getAllSorties(): Promise<Map<number, { id: number; stage_id: number; selected_content: Partial<SelectedContent> }[]>> {
+    const { data, error } = await supabase
+        .from('sorties')
+        .select('id, stage_id, selected_content')
+        .order('date', { ascending: false });
 
-      if (error) {
-          console.error('Error fetching all sorties:', error);
-          return new Map();
-      }
-
-      const sortiesByStage = new Map<number, Sortie[]>();
-      data?.forEach(s => {
-          const sortie: Sortie = {
-              ...s,
-              selected_notions: (s.selected_notions || { niveau: 0, comprendre: 0, observer: 0, proteger: 0 }) as Partial<SelectedNotions>,
-              selected_content: (s.selected_content || {}) as Partial<SelectedContent>,
-          };
-          if (!sortiesByStage.has(s.stage_id)) {
-              sortiesByStage.set(s.stage_id, []);
-          }
-          sortiesByStage.get(s.stage_id)!.push(sortie);
-      });
-
-      console.log(`[getAllSorties] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} sorties for ${sortiesByStage.size} stages`);
-      return sortiesByStage;
-    } catch (error) {
-      console.error('Error fetching all sorties:', error);
-      return new Map();
+    if (error) {
+        console.error('Error fetching all sorties:', error);
+        return new Map();
     }
+
+    const sortiesByStage = new Map<number, { id: number; stage_id: number; selected_content: Partial<SelectedContent> }[]>();
+    data?.forEach(s => {
+        const sortie = {
+            id: s.id,
+            stage_id: s.stage_id,
+            selected_content: s.selected_content as Partial<SelectedContent>,
+        };
+        if (!sortiesByStage.has(s.stage_id)) {
+            sortiesByStage.set(s.stage_id, []);
+        }
+        sortiesByStage.get(s.stage_id)!.push(sortie);
+    });
+    return sortiesByStage;
 }
 
 export async function getSortieById(sortieId: number): Promise<Sortie | null> {
@@ -214,11 +227,11 @@ async function generateMemoForProgram(stage: Stage, levelIndex: number, mainThem
         observer: [],
         proteger: []
     };
-    
+
     const pillarMap = {
-      'COMPRENDRE': 'comprendre',
-      'OBSERVER': 'observer',
-      'PROTÉGER': 'proteger'
+        'COMPRENDRE': 'comprendre',
+        'OBSERVER': 'observer',
+        'PROTÉGER': 'proteger'
     }
 
     selectedCards.forEach(card => {
@@ -246,7 +259,7 @@ async function generateMemoForProgram(stage: Stage, levelIndex: number, mainThem
     if (selectedCards.length === 0) {
         content += `Aucun contenu pédagogique sélectionné pour ce programme.\n`;
     }
-    
+
     content += `MATÉRIEL & SÉCURITÉ\n`;
     content += `--------------------------------\n`;
     content += `Points de vigilance: ${niveau.safety?.join(', ') || 'Aucun point spécifique.'}\n\n`;
@@ -272,33 +285,33 @@ export async function saveOrUpdateProgramForStage(
     }
 
     const { error: deleteError } = await supabase.from('sorties').delete().eq('stage_id', stageId);
-    if(deleteError) {
+    if (deleteError) {
         console.error("Error deleting old sorties:", deleteError);
         return { success: false, error: "Impossible de réinitialiser le programme existant." };
     }
-    
+
     if (selectedCardIds.length === 0) {
         revalidatePath(`/stages/${stageId}`);
         revalidatePath(`/stages/${stageId}/programme`);
         return { success: true };
     }
-    
+
     if (mainThemeTitles.length === 0) {
         return { success: false, error: "Thème principal non trouvé." };
     }
-        
-    const selectedCardsDetails = selectedCardIds.map(id => 
+
+    const selectedCardsDetails = selectedCardIds.map(id =>
         allCards.find(c => c.id.toString() === id)
     ).filter((c): c is PedagogicalContent => !!c);
 
     const memoContent = await generateMemoForProgram(stage, stageLevel, mainThemeTitles, selectedCardsDetails, etagesData);
     const totalDuration = 0; // duration is deprecated
     const stageDays = eachDayOfInterval({ start: parseISO(stage.start_date), end: parseISO(stage.end_date) });
-    
-    const selectedNotions = { niveau: stageLevel, comprendre: 0, observer: 0, proteger: 0};
+
+    const selectedNotions = { niveau: stageLevel, comprendre: 0, observer: 0, proteger: 0 };
     const selectedContent = { program: selectedCardIds, themes: mainThemeTitles };
 
-    const sortieTitle = `Programme: ${mainThemeTitles.join(', ').substring(0,50)}...`
+    const sortieTitle = `Programme: ${mainThemeTitles.join(', ').substring(0, 50)}...`
 
     const promises = [];
     for (const day of stageDays) {
@@ -325,7 +338,7 @@ export async function saveOrUpdateProgramForStage(
         console.error("Errors saving program:", errors);
         return { success: false, error: "Certains objectifs n'ont pas pu être sauvegardés." };
     }
-    
+
     // --- Update stage title dynamically ---
     const levelLabel = etagesData.niveau.options[stageLevel]?.label || `Niveau ${stageLevel + 1}`;
     // Ensure we don't append to an already dynamic title
@@ -344,34 +357,61 @@ export async function saveOrUpdateProgramForStage(
 
 export async function getPedagogicalContent(): Promise<PedagogicalContent[]> {
     try {
-      const { data, error } = await supabase
-          .from('pedagogical_content')
-          .select('*')
-          .order('id')
-          .limit(500); // Limite raisonnable pour le contenu pédagogique
-      if (error) {
-          console.error("Error fetching pedagogical content:", error);
-          return [];
-      }
-      return data;
+        const { data, error } = await supabase
+            .from('pedagogical_content')
+            .select('*')
+            .order('id')
+            .limit(500); // Limite raisonnable pour le contenu pédagogique
+        if (error) {
+            console.error("Error fetching pedagogical content:", error);
+            return [];
+        }
+        return data;
     } catch (error) {
-      console.error("Error fetching pedagogical content:", error);
-      return [];
+        console.error("Error fetching pedagogical content:", error);
+        return [];
     }
 }
 
 export async function getPedagogicalContentById(id: number): Promise<PedagogicalContent | null> {
     try {
-      const { data, error } = await supabase.from('pedagogical_content').select('*').eq('id', id).single();
-      if (error) {
-          console.error("Error fetching pedagogical content by id:", error);
-          return null;
-      }
-      return data;
+        const { data, error } = await supabase.from('pedagogical_content').select('*').eq('id', id).single();
+        if (error) {
+            console.error("Error fetching pedagogical content by id:", error);
+            return null;
+        }
+        return data;
     } catch (error) {
-      console.error("Error fetching pedagogical content by id:", error);
-      return null;
+        console.error("Error fetching pedagogical content by id:", error);
+        return null;
     }
+}
+
+export async function getPedagogicalContentMinimal(): Promise<Pick<PedagogicalContent, 'id' | 'tags_theme' | 'dimension'>[]> {
+    const { data, error } = await supabase
+        .from('pedagogical_content')
+        .select('id, tags_theme, dimension')
+        .order('id');
+    if (error) {
+        console.error('Error fetching pedagogical content minimal:', error);
+        return [];
+    }
+    return data || [];
+}
+
+export async function getAllGameCardsMinimal(): Promise<{ id: number; theme: string }[]> {
+    const { data, error } = await supabase
+        .from('game_cards')
+        .select('id, data')
+        .order('id');
+    if (error) {
+        console.error('Error fetching game cards minimal:', error);
+        return [];
+    }
+    return (data || []).map(row => ({
+        id: row.id,
+        theme: (row.data as any)?.theme || 'Général'
+    }));
 }
 
 export async function createPedagogicalContent(content: Omit<PedagogicalContent, 'id'>) {
@@ -407,87 +447,87 @@ export async function deletePedagogicalContent(id: number) {
 
 // This function transforms the DB data into the structure the app uses
 export async function getEtagesData(): Promise<EtagesData | null> {
-  try {
-    const allCards: PedagogicalContent[] = await getPedagogicalContent();
-    
-    const contentCards: ContentCard[] = allCards.map(q => ({
-      id: `${q.id}`,
-      question: q.question,
-      answer: q.objectif,
-      option_id: q.dimension.toLowerCase(),
-      priority: 'essential',
-      status: 'validated',
-      type: 'Question',
-      duration: 0, 
-      tags_theme: q.tags_theme || [],
-      tags_filtre: q.tags_filtre || [],
-      niveau: q.niveau,
-      tags: q.tags_filtre || [],
-      tip: q.tip || ''
-    }));
+    try {
+        const allCards: PedagogicalContent[] = await getPedagogicalContent();
 
-    const etagesData: EtagesData = {
-      niveau: {
-        id: "niveau",
-        title: "Niveau du Groupe",
-        icon: "Target",
-        color: "blue",
-        options: [
-          { id: "niv1", label: "1 - Je prends conscience, je découvre", tip: "Objectifs pour prendre conscience de son environnement.", etage_id: 'niveau', order:1, contentCards:[], duration:null, group_size:null, safety:[], materials:[] },
-          { id: "niv2", label: "2-3 - J'agis en conscience, je m’adapte", tip: "Objectifs pour agir en conscience et s'adapter.", etage_id: 'niveau', order:2, contentCards:[], duration:null, group_size:null, safety:[], materials:[] },
-          { id: "niv3", label: "4-5 - J’agis de façon responsable, j'anticipe", tip: "Objectifs pour anticiper et agir de manière autonome et éclairée.", etage_id: 'niveau', order:3, contentCards:[], duration:null, group_size:null, safety:[], materials:[] }
-        ],
-      },
-      comprendre: {
-        id: "comprendre",
-        title: "Comprendre",
-        icon: "BookOpen",
-        color: "yellow",
-        options: [],
-      },
-      observer: {
-        id: "observer",
-        title: "Observer",
-        icon: "Eye",
-        color: "blue",
-        options: [],
-      },
-      proteger: {
-        id: "proteger",
-        title: "Protéger",
-        icon: "Shield",
-        color: "green",
-        options: [],
-      },
-    };
+        const contentCards: ContentCard[] = allCards.map(q => ({
+            id: `${q.id}`,
+            question: q.question,
+            answer: q.objectif,
+            option_id: q.dimension.toLowerCase(),
+            priority: 'essential',
+            status: 'validated',
+            type: 'Question',
+            duration: 0,
+            tags_theme: q.tags_theme || [],
+            tags_filtre: q.tags_filtre || [],
+            niveau: q.niveau,
+            tags: q.tags_filtre || [],
+            tip: q.tip || ''
+        }));
 
-    const pillarMap = {
-      'COMPRENDRE': 'comprendre',
-      'OBSERVER': 'observer',
-      'PROTÉGER': 'proteger'
+        const etagesData: EtagesData = {
+            niveau: {
+                id: "niveau",
+                title: "Niveau du Groupe",
+                icon: "Target",
+                color: "blue",
+                options: [
+                    { id: "niv1", label: "1 - Je prends conscience, je découvre", tip: "Objectifs pour prendre conscience de son environnement.", etage_id: 'niveau', order: 1, contentCards: [], duration: null, group_size: null, safety: [], materials: [] },
+                    { id: "niv2", label: "2-3 - J'agis en conscience, je m’adapte", tip: "Objectifs pour agir en conscience et s'adapter.", etage_id: 'niveau', order: 2, contentCards: [], duration: null, group_size: null, safety: [], materials: [] },
+                    { id: "niv3", label: "4-5 - J’agis de façon responsable, j'anticipe", tip: "Objectifs pour anticiper et agir de manière autonome et éclairée.", etage_id: 'niveau', order: 3, contentCards: [], duration: null, group_size: null, safety: [], materials: [] }
+                ],
+            },
+            comprendre: {
+                id: "comprendre",
+                title: "Comprendre",
+                icon: "BookOpen",
+                color: "yellow",
+                options: [],
+            },
+            observer: {
+                id: "observer",
+                title: "Observer",
+                icon: "Eye",
+                color: "blue",
+                options: [],
+            },
+            proteger: {
+                id: "proteger",
+                title: "Protéger",
+                icon: "Shield",
+                color: "green",
+                options: [],
+            },
+        };
+
+        const pillarMap = {
+            'COMPRENDRE': 'comprendre',
+            'OBSERVER': 'observer',
+            'PROTÉGER': 'proteger'
+        }
+
+        Object.entries(pillarMap).forEach(([jsonKey, etageKey]) => {
+            const cardsForPillar = contentCards.filter(c => c.option_id === etageKey);
+            etagesData[etageKey as keyof EtagesData].options.push({
+                id: etageKey,
+                etage_id: etageKey,
+                label: `Toutes les notions - ${etageKey}`,
+                tip: '',
+                order: 1,
+                contentCards: cardsForPillar,
+                duration: null,
+                group_size: null,
+                safety: [],
+                materials: []
+            });
+        });
+
+        return etagesData;
+    } catch (error) {
+        console.error('Error processing etages data from DB:', error);
+        return null;
     }
-
-    Object.entries(pillarMap).forEach(([jsonKey, etageKey]) => {
-      const cardsForPillar = contentCards.filter(c => c.option_id === etageKey);
-      etagesData[etageKey as keyof EtagesData].options.push({
-          id: etageKey,
-          etage_id: etageKey,
-          label: `Toutes les notions - ${etageKey}`,
-          tip: '',
-          order: 1,
-          contentCards: cardsForPillar,
-          duration: null,
-          group_size: null,
-          safety: [],
-          materials: []
-      });
-    });
-
-    return etagesData;
-  } catch (error) {
-    console.error('Error processing etages data from DB:', error);
-    return null;
-  }
 }
 
 // OBSERVATIONS
@@ -518,12 +558,12 @@ export async function createObservation(observation: Omit<Observation, 'id' | 'c
 
 export async function updateObservation(observation: Omit<Observation, 'created_at'>) {
     const { error } = await supabase.from('observations').update({
-      title: observation.title,
-      description: observation.description,
-      category: observation.category,
-      latitude: observation.latitude,
-      longitude: observation.longitude,
-      observation_date: observation.observation_date,
+        title: observation.title,
+        description: observation.description,
+        category: observation.category,
+        latitude: observation.latitude,
+        longitude: observation.longitude,
+        observation_date: observation.observation_date,
     }).eq('id', observation.id);
 
     if (error) {
@@ -667,26 +707,26 @@ const convertDbToGameCard = (dbCard: DbGameCard): GameCard | null => {
 
 
 export async function getAllGameCardsFromDb(): Promise<GameCard[]> {
-  // Paralléliser seed et requête
-  const [, { data, error }] = await Promise.all([
-    seedInitialGameCards(),
-    supabase
-      .from('game_cards')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200) // Limite pour éviter les requêtes trop lourdes
-  ]);
+    // Paralléliser seed et requête
+    const [, { data, error }] = await Promise.all([
+        seedInitialGameCards(),
+        supabase
+            .from('game_cards')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200) // Limite pour éviter les requêtes trop lourdes
+    ]);
 
-  if (error) {
-    console.error('Error fetching game cards:', error);
-    return [];
-  }
-  try {
-    return data.map(convertDbToGameCard).filter(Boolean) as GameCard[];
-  } catch (e) {
-    console.error("Error converting DB cards", e);
-    return [];
-  }
+    if (error) {
+        console.error('Error fetching game cards:', error);
+        return [];
+    }
+    try {
+        return data.map(convertDbToGameCard).filter(Boolean) as GameCard[];
+    } catch (e) {
+        console.error("Error converting DB cards", e);
+        return [];
+    }
 }
 
 export async function getFilteredGameCards(types: GameCardType[], themes: string[], objectiveIds: string[] = []): Promise<GameCard[]> {
@@ -708,7 +748,7 @@ export async function getFilteredGameCards(types: GameCardType[], themes: string
             }
 
             if (objectiveIds.length > 0) {
-               query = query.in('data->>related_objective_id', objectiveIds);
+                query = query.in('data->>related_objective_id', objectiveIds);
             }
 
             return await query;
@@ -719,7 +759,7 @@ export async function getFilteredGameCards(types: GameCardType[], themes: string
         console.error('Error fetching filtered game cards:', error);
         return [];
     }
-     try {
+    try {
         return data.map(convertDbToGameCard).filter(Boolean) as GameCard[];
     } catch (e) {
         console.error("Error converting filtered DB cards", e);
@@ -733,7 +773,7 @@ export async function createGameCard(type: GameCardType, cardData: DbGameCardDat
         type: type,
         data: cardData as any,
     }).select().single();
-    
+
     if (error) {
         console.error('Error creating game card:', error);
         return null;
@@ -851,7 +891,7 @@ export async function deleteGame(id: number, stageId?: number): Promise<boolean>
     }
     revalidatePath('/jeux');
     if (stageId) {
-      revalidatePath(`/stages/${stageId}`);
+        revalidatePath(`/stages/${stageId}`);
     }
     return true;
 }
@@ -1083,12 +1123,10 @@ export async function getStageGameHistory(stageId: number): Promise<StageGameHis
 
 // Nouvelle fonction pour charger tout l'historique des jeux en une seule requête
 export async function getAllStageGameHistory(): Promise<Map<number, StageGameHistory[]>> {
-    const start = performance.now();
     const { data, error } = await supabase
         .from('stage_game_history')
-        .select('*')
+        .select('stage_id, score, total, results')
         .order('created_at', { ascending: false });
-    const duration = performance.now() - start;
 
     if (error) {
         console.error('Error fetching all stage game history:', error);
@@ -1100,10 +1138,8 @@ export async function getAllStageGameHistory(): Promise<Map<number, StageGameHis
         if (!historyByStage.has(row.stage_id)) {
             historyByStage.set(row.stage_id, []);
         }
-        historyByStage.get(row.stage_id)!.push(row);
+        historyByStage.get(row.stage_id)!.push(row as StageGameHistory);
     });
-
-    console.log(`[getAllStageGameHistory] ⏱️ ${duration.toFixed(0)}ms - Loaded ${data?.length || 0} game history entries for ${historyByStage.size} stages`);
     return historyByStage;
 }
 

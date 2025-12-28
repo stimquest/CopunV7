@@ -10,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { CreateStageForm } from '@/components/create-stage-form';
 import { format, parseISO, isBefore, isAfter, startOfToday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress, GameCard, PedagogicalContent } from '@/lib/types';
-import { getStages, createStage as serverCreateStage, getAllSorties, getAllGames, getAllGameCardsFromDb, getPedagogicalContent, getAllCompletedObjectives, getAllStageExploits, getAllStageGameHistory } from '@/app/actions';
+import type { Stage, GrandTheme, AssignedDefi, Defi, Game, GameProgress, ThemeScore, DefiProgress } from '@/lib/types';
+import { getStages, createStage as serverCreateStage, getAllSorties, getAllCompletedObjectives, getAllStageExploits, getAllStageGameHistory, getPedagogicalContentMinimal, getAllGameCardsMinimal } from '@/app/actions';
 import { supabaseOffline } from '@/lib/supabase-offline';
-import { getStagesOfflineAware, getSortiesForStageOfflineAware, getPedagogicalContentOfflineAware } from '@/lib/offline-actions';
+import { getStagesOfflineAware } from '@/lib/offline-actions';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -208,8 +208,6 @@ export default function StageManagerPage() {
     const [isCreating, startCreateTransition] = useTransition();
     const { toast } = useToast();
     const { isOnline, wasOffline } = useOnlineStatus();
-    const [allDbGameCards, setAllDbGameCards] = useState<GameCard[]>([]);
-    const [allPedagogicalContent, setAllPedagogicalContent] = useState<PedagogicalContent[]>([]);
 
     const fetchStages = async () => {
         setLoading(true);
@@ -218,135 +216,120 @@ export default function StageManagerPage() {
         // Charger toutes les données en une seule fois (optimisation)
         console.log('[fetchStages] 🚀 Starting data fetch...');
         const fetchStart = performance.now();
-        const [stagesData, gameCardsData, pedagogicalContent, allCompletedObjectivesMap, allExploitsMap, allGameHistoryMap, allSortiesMap, allGamesMap] = await Promise.all([
+
+        const [
+            stagesData,
+            gameCardsMinimal,
+            pedagogicalMinimal,
+            allCompletedObjectivesMap,
+            allExploitsMap,
+            allGameHistoryMap,
+            allSortiesMap
+        ] = await Promise.all([
             getStagesOfflineAware(),
-            getAllGameCardsFromDb(),
-            getPedagogicalContentOfflineAware(),
+            getAllGameCardsMinimal(),
+            getPedagogicalContentMinimal(),
             getAllCompletedObjectives(),
             getAllStageExploits(),
             getAllStageGameHistory(),
             getAllSorties(),
-            getAllGames()
         ]);
+
         console.log(`[fetchStages] ⏱️ Initial data fetch took ${(performance.now() - fetchStart).toFixed(0)}ms`);
 
-        setAllDbGameCards(gameCardsData || []);
-        setAllPedagogicalContent(pedagogicalContent || []);
+        // Build lookup maps for O(1) access
+        const pedagogicMap = new Map(pedagogicalMinimal.map((p: any) => [p.id.toString(), p]));
+        const gameCardThemeMap = new Map(gameCardsMinimal.map((g: any) => [g.id, g.theme]));
+        const themeByTitleMap = new Map(allThemes.map(t => [t.title, t]));
 
-        // Utiliser les variables locales dans le map pour éviter les problèmes de timing
-        const localGameCards = gameCardsData || [];
-        const localPedagogicalContent = pedagogicalContent || [];
+        const stagesWithProgressData: StageWithProgress[] = [];
 
-        const stagesWithProgressData: StageWithProgress[] = await Promise.all(
-            (stagesData || []).map(async (stage) => {
-                // Récupérer les données depuis les Maps (déjà chargées)
-                const sorties = (allSortiesMap && allSortiesMap.get(stage.id)) || [];
-                const games = (allGamesMap && allGamesMap.get(stage.id)) || [];
+        for (const stage of (stagesData || [])) {
+            const sorties = allSortiesMap.get(stage.id) || [];
+            const programSortie = sorties.find((s: any) => (s.selected_content?.program?.length ?? 0) > 0);
 
-                const programSortie = sorties.find(s => (s.selected_content?.program?.length ?? 0) > 0);
+            const programObjectiveIds = programSortie?.selected_content?.program?.map(String) || [];
 
-                const objectivesProgress: ThemeProgress = {};
-                let mainThemes: GrandTheme[] = [];
-                let defisProgress: DefiProgress = { completed: 0, total: 0 };
-                let gamesProgress: GameProgress = { averageScore: 0, themeScores: {} };
-                
-                // --- Calculate objectives progress ---
-                if (programSortie && programSortie.selected_content.program) {
-                    const programObjectiveIds = new Set(programSortie.selected_content.program);
+            // Completed objectives
+            const completedObjectivesFromDb = allCompletedObjectivesMap.get(stage.id) || [];
+            const completedIdsSet = new Set(completedObjectivesFromDb);
 
-                    // Récupérer les objectifs complétés depuis la Map (déjà chargée)
-                    const completedObjectivesFromDb = (allCompletedObjectivesMap && allCompletedObjectivesMap.get(stage.id)) || [];
-                    const completedIds = new Set(completedObjectivesFromDb);
-                    
-                    const allThemeIdsInProgram = new Set<string>();
+            // Main themes
+            let mainThemes: GrandTheme[] = [];
+            if (programSortie?.selected_content?.themes) {
+                const themeTitles = programSortie.selected_content.themes as string[];
+                mainThemes = themeTitles
+                    .map(title => themeByTitleMap.get(title))
+                    .filter((t): t is GrandTheme => t !== undefined);
+            }
 
-                    programObjectiveIds.forEach(objId => {
-                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
-                        if(content) {
-                            content.tags_theme.forEach(themeId => allThemeIdsInProgram.add(themeId));
+            // Objectives progress
+            const objectivesProgress: ThemeProgress = {};
+            mainThemes.forEach(theme => {
+                objectivesProgress[theme.title] = { completed: 0, total: 0 };
+            });
+
+            for (const objId of programObjectiveIds) {
+                const ped = pedagogicMap.get(objId) as any;
+                if (!ped || !ped.tags_theme) continue;
+                const themeIds = ped.tags_theme;
+                for (const theme of mainThemes) {
+                    if (themeIds.includes(theme.id)) {
+                        objectivesProgress[theme.title].total++;
+                        if (completedIdsSet.has(objId)) {
+                            objectivesProgress[theme.title].completed++;
                         }
-                    });
-
-                    mainThemes = Array.from(allThemeIdsInProgram)
-                        .map(themeId => allThemes.find(t => t.id === themeId))
-                        .filter((t): t is GrandTheme => t !== undefined && t !== null);
-
-                    mainThemes.forEach(theme => {
-                        objectivesProgress[theme.title] = { completed: 0, total: 0 };
-                    });
-
-                    programObjectiveIds.forEach(objId => {
-                        const content = localPedagogicalContent.find(c => c.id.toString() === objId);
-                        if(content) {
-                            mainThemes.forEach(theme => {
-                                if (content.tags_theme.includes(theme.id)) {
-                                    if (!objectivesProgress[theme.title]) {
-                                        objectivesProgress[theme.title] = { completed: 0, total: 0 };
-                                    }
-                                    objectivesProgress[theme.title].total++;
-                                    if (completedIds.has(objId)) {
-                                        objectivesProgress[theme.title].completed++;
-                                    }
-                                }
-                            });
-                        }
-                    });
-                }
-                
-                // --- Calculate defis progress ---
-                const stageExploits = (allExploitsMap && allExploitsMap.get(stage.id)) || [];
-                defisProgress.total = stageExploits.length;
-                defisProgress.completed = stageExploits.filter(e => e.status === 'complete').length;
-
-                // --- Calculate games/quiz progress ---
-                const gameHistory = (allGameHistoryMap && allGameHistoryMap.get(stage.id)) || [];
-                if (gameHistory.length > 0) {
-                    let totalCorrect = 0;
-                    let totalQuestions = 0;
-                    const themeScores: Record<string, ThemeScore> = {};
-
-                    gameHistory.forEach(entry => {
-                        // Ajouter le score global
-                        totalCorrect += entry.score;
-                        totalQuestions += entry.total;
-
-                        // Analyser les résultats par thème si disponibles
-                        if (entry.results && Array.isArray(entry.results)) {
-                            (entry.results as any[]).forEach((result: any) => {
-                                // Essayer de trouver le thème depuis la carte
-                                const card = localGameCards.find(c => c.id === result.cardId);
-                                const theme = card?.theme || result.theme || 'Inconnu';
-
-                                if (!themeScores[theme]) {
-                                    themeScores[theme] = { correct: 0, total: 0 };
-                                }
-
-                                if (result.isCorrect !== undefined) {
-                                    themeScores[theme].total++;
-                                    if (result.isCorrect) {
-                                        themeScores[theme].correct++;
-                                    }
-                                }
-                            });
-                        }
-                    });
-
-                    if (totalQuestions > 0) {
-                        gamesProgress.averageScore = Math.round((totalCorrect / totalQuestions) * 100);
                     }
-                    gamesProgress.themeScores = themeScores;
                 }
+            }
 
+            // Defis progress
+            const stageExploits = allExploitsMap.get(stage.id) || [];
+            const defisProgress: DefiProgress = {
+                total: stageExploits.length,
+                completed: stageExploits.filter((e: any) => e.status === 'complete').length,
+            };
 
-                return {
-                    ...stage,
-                    objectivesProgress,
-                    defisProgress,
-                    gamesProgress,
-                    mainThemes: mainThemes || [],
-                };
-            })
-        );
+            // Games progress
+            const gameHistory = allGameHistoryMap.get(stage.id) || [];
+            let totalCorrect = 0;
+            let totalQuestions = 0;
+            const themeScores: Record<string, ThemeScore> = {};
+
+            gameHistory.forEach((entry: any) => {
+                totalCorrect += entry.score;
+                totalQuestions += entry.total;
+
+                if (entry.results && Array.isArray(entry.results)) {
+                    (entry.results as any[]).forEach((result: any) => {
+                        const cardId = result.cardId;
+                        const theme = cardId ? (gameCardThemeMap.get(cardId) || result.theme || 'Inconnu') : 'Inconnu';
+                        if (!themeScores[theme]) {
+                            themeScores[theme] = { correct: 0, total: 0 };
+                        }
+                        if (result.isCorrect !== undefined) {
+                            themeScores[theme].total++;
+                            if (result.isCorrect) {
+                                themeScores[theme].correct++;
+                            }
+                        }
+                    });
+                }
+            });
+
+            const gamesProgress: GameProgress = {
+                averageScore: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0,
+                themeScores: themeScores,
+            };
+
+            stagesWithProgressData.push({
+                ...stage,
+                objectivesProgress,
+                defisProgress,
+                gamesProgress,
+                mainThemes,
+            });
+        }
 
         setStagesWithProgress(stagesWithProgressData);
         console.log(`[fetchStages] ✅ Total time: ${(performance.now() - startTime).toFixed(0)}ms for ${stagesWithProgressData.length} stages`);

@@ -80,7 +80,7 @@ export default function MarketingPage() {
                                     </Button>
                                 </Link>
                                 <Link href="#features">
-                                    <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 text-lg border-slate-300 text-slate-700 hover:bg-slate-50">
+                                    <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 text-lg border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-blue-600">
                                         En savoir plus
                                     </Button>
                                 </Link>
@@ -141,9 +141,10 @@ export default function MarketingPage() {
             {/* Méthode Section */}
             <section id="method" className="py-16 md:py-24 bg-slate-900 text-white">
                 <div className="container mx-auto px-4 md:px-6">
-                    <div className="text-center max-w-3xl mx-auto mb-16">
+                    <div className="text-center max-w-6xl mx-auto mb-16">
                         <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                            La Méthode : Comprendre, Observer, Protéger
+                            la méthode COP'UN : Comprendre, Observer, Protéger 
+                            <h4>pour ne faire qu'UN, être en harmonie avec l'environnement</h4>
                         </h2>
                         <p className="mt-4 text-lg text-slate-300">
                             Notre approche s'articule autour de trois piliers fondamentaux pour une connaissance complète du milieu marin.
@@ -293,7 +294,7 @@ export default function MarketingPage() {
                     <div className="bg-blue-600 rounded-3xl p-8 md:p-16 text-center text-white overflow-hidden relative">
                         <div className="relative z-10 max-w-2xl mx-auto space-y-8">
                             <h2 className="text-3xl font-bold sm:text-4xl">
-                                Rejoignez le mouvement Cop'un de la Mer
+                                Rejoignez le mouvement Cop'un avec la Mer
                             </h2>
                             <p className="text-blue-100 text-lg">
                                 Faites de chaque vague une vague de conscience. Commencez dès aujourd'hui à transformer vos stages.
@@ -329,7 +330,7 @@ export default function MarketingPage() {
                                                         href="mailto:contact@copundelamer.com"
                                                         className="text-blue-700 hover:text-blue-900 hover:underline"
                                                     >
-                                                        contact@copundelamer.com
+                                                        stimquest@gmail.com
                                                     </a>
                                                 </div>
                                             </div>
@@ -391,7 +392,7 @@ export default function MarketingPage() {
                         </div>
                     </div>
                     <div className="mt-12 pt-8 border-t border-slate-200 text-center text-sm">
-                        <p>&copy; {new Date().getFullYear()} Cop'un de la Mer. Tous droits réservés.</p>
+                        <p>&copy; {new Date().getFullYear()} Cop'un avec la Mer. Tous droits réservés.</p>
                     </div>
                 </div>
             </footer>
