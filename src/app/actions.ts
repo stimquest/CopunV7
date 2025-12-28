@@ -995,7 +995,7 @@ export async function toggleObjectiveCompletion(stageId: number, objectiveId: st
     }
 
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath('/stages');
+    // Note: revalidatePath('/stages') supprimé - la liste recharge côté client
     return true;
 }
 
@@ -1066,7 +1066,6 @@ export async function addStageExploit(stageId: number, exploitId: string): Promi
         return false;
     }
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath('/stages');
     return true;
 }
 
@@ -1082,7 +1081,6 @@ export async function removeStageExploit(stageId: number, exploitId: string): Pr
         return false;
     }
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath('/stages');
     return true;
 }
 
@@ -1092,7 +1090,7 @@ export async function updateStageExploitStatus(stageId: number, exploitId: strin
         .update({
             status: status,
             completed_at: status === 'complete' ? new Date().toISOString() : null,
-            preuves_url: preuveUrl ? [preuveUrl] : null, // Assuming preuves_url is an array of strings (Json)
+            preuves_url: preuveUrl ? [preuveUrl] : null,
         })
         .eq('stage_id', stageId)
         .eq('exploit_id', exploitId);
@@ -1102,7 +1100,6 @@ export async function updateStageExploitStatus(stageId: number, exploitId: strin
         return false;
     }
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath('/stages');
     return true;
 }
 
@@ -1170,6 +1167,5 @@ export async function saveStageGameResult(stageId: number, gameId: number, score
 
     console.log('[saveStageGameResult] Successfully saved:', data);
     revalidatePath(`/stages/${stageId}`);
-    revalidatePath('/stages');
     return true;
 }

@@ -348,18 +348,21 @@ export default function StageManagerPage() {
         }
     }, [isOnline, wasOffline]);
 
-    // Recharger les stages lorsque la fenêtre regagne le focus pour synchroniser le localStorage
+    // DÉSACTIVÉ: Le rechargement sur focus génère trop de requêtes serveur
+    // et consomme du compute inutilement sur Netlify.
+    // Les données sont rechargées au montage du composant et après une action offline.
+    // Si vous avez besoin de cette fonctionnalité, ajoutez un throttle de 30 secondes minimum.
+    /*
     useEffect(() => {
         const handleFocus = () => {
-            // Recharger uniquement si nous ne sommes pas déjà en train de charger
             if (!loading) {
                 fetchStages();
             }
         };
-
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, [loading]);
+    */
 
     const { currentStages, upcomingStages, pastStages } = useMemo(() => {
         const today = startOfToday();
